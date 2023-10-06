@@ -552,16 +552,12 @@ def askConfirm(texto): #parametro localIndex tipo INT y parametro texto de tipo 
 def enableLocalPrompt(localData, posL): #parametro localIndex tipo INT
     if askConfirm("Desea activar nuevamente este local"):
         localData.estado = 'A'
-        localsFile.seek(posL,0)
-        pickle.dump(localData, localsFile)
-        localsFile.flush()
-
+        saveLocal(localData, posL)
+        
 def disableLocalPrompt(localData, posL): #parametro localIndex tipo INT
     if askConfirm("Desea eliminar este local"):
         localData.estado = 'B'
-        localsFile.seek(posL,0)
-        pickle.dump(localData, localsFile)
-        localsFile.flush()
+        saveLocal(localData, posL)
 
 def modifyLocal():
     lCode = input("[?] Ingrese el codigo del local\n")
@@ -626,8 +622,12 @@ def deleteLocal():
         disableLocalPrompt(localData, pos)
         print("[+] Local eliminado")
     
-def mapaLocales():
-    global LOCALES_CODE
+def localMaps():
+    fileSize = os.path.getsize(localsFilePath)
+    localsFile.seek (0, 0)
+    _ = pickle.load(localsFile)
+    regSize = localsFile.tell() 
+    total = int(fileSize / regSize)  
     
     for fila in range(0,10):
         inicio = 5 * fila
@@ -635,16 +635,30 @@ def mapaLocales():
         
         print("+--+--+--+--+--+")
         for local in range(inicio, fin):
-            lId = str(LOCALES_CODE[local][0])
-            if LOCALES_CODE[local][0] < 10:
-                lId = "0"+lId
+            lId = "0"
+            if local < total:
+                localsFile.seek(local*regSize, 0)
+                l = parselocal(pickle.load(localsFile))
+                color = VERDE
+                if l.estado != "A":
+                    color = ROJO
+
+                if l.codLocal < 10:
+                    lId = color + lId + str(l.codLocal) + RESET
+                else:
+                    lId = color + str(l.codLocal) + RESET
+            else:
+                lId = lId +"0"
 
             if local != fin - 1:
-                print("|"+str(lId), end="")
+                print(f"|{str(lId)}", end="")
             else:
-                print("|"+str(lId)+"|")
+                print(f"|{str(lId)}|")
     print("+--+--+--+--+--+")
-    
+    if total > 50:
+        print("proximamente se habilitara un mapa con los demas locales")
+
+
 # Funcion que muestra el menu de Gestion de locales
 def localManage():
     print('''
@@ -673,7 +687,7 @@ e) Volver
                 listLocals()
                 deleteLocal()
             case 100: 
-                mapaLocales()
+                localMaps()
         
         print('''
 a) Crear locales
@@ -895,9 +909,7 @@ def entryPoint():
     \n''')
         
     loadFiles()
-    #authMenu()
-    #listLocals()
-    adminMenu()
+    authMenu()
     unloadFiles()
 
 entryPoint()
