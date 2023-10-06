@@ -53,7 +53,12 @@ class Novedad:
         self.tipoUsuario  = ""
         self.estado = "A"
 
-# Declaramos variables que contienen los tamaños de los campos a utilizar
+# Declaramos "variables" que contienen codigo de colores
+ROJO="\033[31m"
+RESET="\033[0m"
+VERDE = "\033[32m"
+
+# Declaramos "variables" que contienen los tamaños de los campos a utilizar
 USER_NAME_LENGHT = 100
 USER_PASS_LENGHT = 8
 USER_TYPE_LENGHT = 20
@@ -67,12 +72,12 @@ PROMO_TEXT_LENGHT = 200
 NEW_TEXT_LENGHT = 200
 NEW_TYPE_LENGHT = 20
 
-# Declaramos variables de los tipos de usuarios existentes
+# Declaramos "variables" de los tipos de usuarios existentes
 USER_TYPE_ADMIN = "administrador"
 USER_TYPE_CLIENT = "cliente"
 USER_TYPE_LOCALOWNER = "dueñoLocal"
 
-# Declaramos las variables de los tipos de locales que existen
+# Declaramos las "variables" de los tipos de locales que existen
 LOCAL_TYPE_FOOD = "comida"
 LOCAL_TYPE_PERFUME = "perfumeria"
 LOCAL_TYPE_FASHION = "indumentaria"
@@ -158,8 +163,11 @@ def parseUser(user):
     return user
 
 # funcion para guardar un local en el archivo
-def saveLocal(local):
+def saveLocal(local, pos):
     localsFile.seek(0, os.SEEK_END)
+
+    if pos != 0:
+        localsFile.seek(pos, 0)
 
     local.codLocal = str(local.codLocal).ljust(10)
     local.codUsuario  = str(local.codUsuario).ljust(10)
@@ -418,9 +426,13 @@ def listLocals():
     if quantityOfLocals > 0:
         if askConfirm("Desea ver los locales guardados hasta el momento?"):
             for i in range(quantityOfLocals):
-                print(f"============ LOCAL Nº {str(i)} ============")
+                color = VERDE
+                if local.estado != "A":
+                    color = ROJO
+
+                print(f"{color}============ LOCAL Nº {str(i)} ============{RESET}")
                 print(f'Codigo local: {local.codLocal}, Nombre: {local.nombreLocal}, Ubicacion: {local.ubicacionLocal}, Rubro: {local.rubroLocal}, Estado: {local.estado} ')
-                print(f"====================================\n")
+                print(f"{color}===================================={RESET}\n")
                 if i < quantityOfLocals - 1:
                     local = parselocal(pickle.load(localsFile))
             _ = input("[?] Presione cualquier tecla para continuar")
@@ -477,7 +489,7 @@ def newLocals():
     lName = input("[?] Ingrese el nombre del local (ingrese \".\" para salir)\n")
 
     # Se saca el número de locales para poder poner el codigo de del mismo de manera secuencial
-    localQty = getLocalsQuantity() + 1
+    localQty = getLocalsQuantity()
     registeredLocals = 0
 
     while lName != ".":
@@ -507,7 +519,7 @@ def newLocals():
         addToCategory(local.rubroLocal)
 
         # Se guarda el nuevo local en archivo con la función "saveLocal"
-        saveLocal(local)
+        saveLocal(local, 0)
         time.sleep(1)
         orderLocalsByName()
 
@@ -561,8 +573,6 @@ def modifyLocal():
 
     localData = searchLocalByCode(int(lCode))
 
-    localsFile.seek(pos,0)
-
     if localData.estado != "A":
         enableLocalPrompt(localData, pos)
     
@@ -591,8 +601,7 @@ def modifyLocal():
             localData.rubroLocal = r
             addToCategory(localData.rubroLocal)
 
-        localsFile.seek(pos, 0)
-        pickle.dump(localData, localsFile)
+        saveLocal(localData, pos)
 
         orderCategories()
         orderLocalsByName()
