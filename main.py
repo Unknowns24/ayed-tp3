@@ -63,13 +63,18 @@ LOCAL_CATG_LENGHT = 50
 
 PROMO_TEXT_LENGHT = 200
 
-NEWNESS_TEXT_LENGHT = 200
-NEWNESS_TYPE_LENGHT = 20
+NEW_TEXT_LENGHT = 200
+NEW_TYPE_LENGHT = 20
 
 # Declaramos variables de los tipos de usuarios existentes
 USER_TYPE_ADMIN = "administrador"
 USER_TYPE_CLIENT = "cliente"
-USER_TYPE_LOCALOWNER = "cliente"
+USER_TYPE_LOCALOWNER = "dueñoLocal"
+
+# Declaramos las variables de los tipos de locales que existen
+LOCAL_TYPE_FOOD = "comida"
+LOCAL_TYPE_PERFUME = "perfume"
+LOCAL_TYPE_FASHION = "indumentaria"
 
 # Declaramos la variable donde se guardaran el usuario y contraseña correctas
 attempts = 0 # Variable tipo INT
@@ -80,24 +85,21 @@ userFilePath = mainPath+"usuarios.dat"
 localsFilePath = mainPath+"locales.dat"
 promsFilePath = mainPath+"promociones.dat"
 promsUseFilePath = mainPath+"uso_promociones.dat"
-newnessFilePath = mainPath+"novedades.dat"
+newsFilePath = mainPath+"novedades.dat"
 
 # Declaramos las variables donde se guardaran los archivos logicos ya cargados
 userFile = 0
 localsFile = 0
 promsFile = 0
 promsUseFile = 0
-newnessFile = 0
+newsFile = 0
 
-# Declaramos variable sobre el usuario
-MY_USER = -1 # Variable tipo INT
-
-# contador global de locales
-lCount = 0 # Variables tipo INT
+# Declaramos donde se almacena
+MY_USER = Usuario()
 
 # Contadores para locales segun su rubro
-lRubs = ["perfumeria", "indumentaria", "comida"]
-lRubsCount = [0] * 3
+lCategories = ["perfumeria", "indumentaria", "comida"]
+lCategoriesCount = [0] * 3
 
 # funcion abrir archivo
 def openFile(filePath):
@@ -111,10 +113,9 @@ def openFile(filePath):
 
     return logicFile, exists
 
-
 # funcion para cargar archivos
 def loadFiles():
-    global userFile, localsFile, promsFile, promsUseFile, newnessFile
+    global userFile, localsFile, promsFile, promsUseFile, newsFile
     
     # crea la carpeta del tp3 si no existe 
     os.makedirs(mainPath, 775, True)
@@ -123,21 +124,66 @@ def loadFiles():
     if not exists:
         loadAdmin()
 
-    localsFile, _ = openFile(localsFilePath)
+    localsFile, exists = openFile(localsFilePath)
+    if exists: 
+        loadLocals()
+
     promsFile, _ = openFile(promsFilePath)
     promsUseFile, _ = openFile(promsUseFilePath)
-    newnessFile, _ = openFile(newnessFilePath)
-    
+    newsFile, _ = openFile(newsFilePath)
+
+# funcion para cerrar archivos
+def unloadFiles():
+    userFile.close()
+    localsFile.close()
+    promsFile.close()
+    promsUseFile.close()
+    newsFile.close()
+
+# funcion para guardar un usuario en el archivo
+def saveUser(user):
+    user.tipoUsuario = user.tipoUsuario.ljust(USER_TYPE_LENGHT)
+    user.claveUsuario = user.claveUsuario.ljust(USER_PASS_LENGHT)
+    user.nombreUsuario = user.nombreUsuario.ljust(USER_NAME_LENGHT)
+
+    pickle.dump(user, userFile)
+    userFile.flush()
+
+# funcion para guardar un local en el archivo
+def saveLocal(local):
+    local.nombreLocal = local.nombreLocal.ljust(LOCAL_NAME_LENGHT)
+    local.ubicacionLocal = local.ubicacionLocal.ljust(LOCAL_ADDR_LENGHT)
+    local.rubroLocal = local.rubroLocal.ljust(LOCAL_CATG_LENGHT)
+
+    pickle.dump(local, localsFile)
+    localsFile.flush()
+
+# funcion para guardar una novedad en el archivo
+def saveNew(new):
+    new.textoNovedad = new.textoNovedad.ljust(NEW_TEXT_LENGHT)
+    new.tipoUsuario = new.tipoUsuario.ljust(NEW_TYPE_LENGHT)
+    pickle.dump(new, newsFile)
+    newsFile.flush()
+
 # funcion para la carga de usuario
 def loadAdmin():
     adminUser = Usuario()
     adminUser.codUsuario = 1
-    adminUser.nombreUsuario = "admin@shopping".ljust(USER_NAME_LENGHT)
-    adminUser.tipoUsuario = USER_TYPE_ADMIN.ljust(USER_TYPE_LENGHT)
-    adminUser.claveUsuario = "12345678"
+    adminUser.nombreUsuario = "admin@shopping.com"
+    adminUser.tipoUsuario = USER_TYPE_ADMIN
+    adminUser.claveUsuario = "12345"
+    
+    saveUser(adminUser)
 
-    pickle.dump(adminUser, userFile)
-    userFile.flush()
+# funcion para cargar la cantidad de locales por rubro en lCategories
+def loadLocals():
+    fileSize = os.path.getsize(localsFilePath)
+    localsFile.seek(0,0)
+
+    while localsFile.tell() < fileSize:
+        localsFile.tell()
+        local = pickle.load(localsFile)
+        addToCategory(local.rubroLocal)
 
 # funcion para leer opciones numericas en rango
 def optionRange(inicio, fin):
@@ -146,15 +192,15 @@ def optionRange(inicio, fin):
         opc = int(input('Elije una opcion valida: '))
     return opc 
 
-# funciones para el menu de autenticacion:
+# funciones para el menu de autenticacion:FL
 def authMenuOpts():
     print('1. Ingresar con usuario registrado')
     print('2. Registrarse como cliente')
     print('3. Salir')
 
 def authMenu():    
-    opc = optionRange(1,3)
     authMenuOpts()
+    opc = optionRange(1,3)
 
     while opc != 3:
         match opc:
@@ -177,19 +223,47 @@ def registerUser():
 
         mail = input('Email ya registrado, pruebe con otro: ')
     
-    user.nombreUsuario = mail.ljust(USER_NAME_LENGHT)
+    user.nombreUsuario = mail
     user.claveUsuario = input('Ingrese una contraseña nueva(tiene que tener '+str(USER_PASS_LENGHT)+' caracteres): ')
     
     while len(user.claveUsuario) != USER_PASS_LENGHT:
         user.claveUsuario = input('La contraseña que acaba de ingresar no tiene '+str(USER_PASS_LENGHT)+' caracteres, ingrese otra: ')
     
-    user.tipoUsuario = 'cliente'.ljust(USER_TYPE_LENGHT)
-    pickle.dump(user, userFile)
-    userFile.flush()
+    user.tipoUsuario = USER_TYPE_CLIENT
+    saveUser(user)
     print('Registrado correctamente')
 
-# funcion para buscar un email dentro del archivo de usuarios
-def searchUserByMail(mail):
+# funciones para buscar un local
+def searchLocalEnginge(searchFunc, param):
+    T = os.path.getsize(localsFilePath)
+    pos = -1 
+    locals = Locales()
+    localsFound = False
+    localsFile.seek(0,0)
+
+    while not localsFound and localsFile.tell() < T:
+        # lee puntero
+        p = localsFile.tell()
+
+        # carga contenido
+        tmp = pickle.load(localsFile)
+        
+        # chequea si el nombre es igual al mail
+        if searchFunc(tmp, param):
+            pos = p
+            locals = tmp
+            localsFound = True
+    
+    return locals, pos
+
+def searchLocalByCodeCondition(local, code):
+    return local.codLocal == code
+
+def searchLocalByCode(code):
+    return searchLocalEnginge(searchLocalByCodeCondition, code)
+
+# funciones para buscar un usuario en base a ciertos datos
+def searchUserEnginge(searchFunc, param):
     T = os.path.getsize(userFilePath)
     usr = Usuario()
     usrFound = False
@@ -203,36 +277,37 @@ def searchUserByMail(mail):
         tmp = pickle.load(userFile)
         
         # chequea si el nombre es igual al mail
-        if tmp.nombreUsuario == mail:
+        if searchFunc(tmp, param):
+            usr = tmp
             usrFound = True
-        
-        usr = tmp
-
     return usr
-    
 
-# funcion que retorna un booleano dependiendo si el codigo de usuario ingresado es dueño de local
-def isLocalOwner(userCode): # parametro userCode tipo INT
-    global USERS
-    global USERS_CODE
-    founded = False
-    isOwner = False
-    uIndex = 0
+def searchUserByMailCondition(usr, mail):
+    return usr.nombreUsuario.strip() == mail
 
-    while (not founded and uIndex <= 3):
-        if USERS_CODE[uIndex] == userCode:
-            founded = True
-            if USERS[uIndex][2] == "dueñoLocal":
-                isOwner = True
-        else:
-            uIndex = uIndex + 1
-    
-    return isOwner;
-    
-def nombreInvalido(nombre):
-    global lCount
+def searchUserByMail(mail):
+    return searchUserEnginge(searchUserByMailCondition, mail)
+
+def searchUserByCodeCondition(usr, code):
+    return usr.codUsuario.strip() == code
+
+def searchUserByCode(code):
+    return searchUserEnginge(searchUserByCodeCondition, code)
+
+# funcion para conseguir la cantidad de locales
+def getLocalsQuantity():
+    fileSize = os.path.getsize(localsFilePath)
+    localsFile.seek (0, 0)
+    _ = pickle.load(localsFile)
+    regSize = localsFile.tell() 
+    total = int(fileSize / regSize)  
+        
+    return total
+
+# funcion para validar si el nombre del local es valido
+def invalidLocalName(nombre):
     inicio = 0
-    fin = lCount - 1
+    fin = getLocalsQuantity() - 1
     founded = False
 
     while (inicio <= fin and not founded):
@@ -245,138 +320,139 @@ def nombreInvalido(nombre):
             fin = medio - 1
     
     return founded
-            
-def ordenarRubros():
-    global lRubs
-    global lRubsCount
-            
-    for i in range(0, len(lRubsCount) - 1):
-        for r in range(0, len(lRubsCount)):
-            if r != 2 and lRubsCount[i] < lRubsCount[r + 1]:
-                auxRubs = lRubs[i]
-                auxRubsCnt = lRubsCount[i]
 
-                lRubs[i] = lRubs[r + 1]
-                lRubsCount[i] = lRubsCount[r + 1]
+# funcion para ordenar las categorias de mayor a menor
+def orderCategories():
+    global lCategories, lCategoriesCount
+            
+    for i in range(0, len(lCategoriesCount) - 1):
+        for r in range(0, len(lCategoriesCount)):
+            if r != 2 and lCategoriesCount[i] < lCategoriesCount[r + 1]:
+                auxRubs = lCategories[i]
+                auxRubsCnt = lCategoriesCount[i]
+
+                lCategories[i] = lCategories[r + 1]
+                lCategoriesCount[i] = lCategoriesCount[r + 1]
                 
-                lRubs[r + 1] = auxRubs
-                lRubsCount[r + 1] = auxRubsCnt
+                lCategories[r + 1] = auxRubs
+                lCategoriesCount[r + 1] = auxRubsCnt
 
-def verLocalesPrompt():
-    global lCount;
-    global LOCALES
-    global LOCALES_CODE
+# funcion para listar locales
+def listLocals():
+    local = Locales()
+    T = os.path.getsize(localsFilePath)
+    localsFile.seek(0)
+    local = pickle.load(localsFile)
+    singleT = localsFile.tell()
+    quantityOfLocals = T // singleT
+    if quantityOfLocals > 0:
+        confirm = input('Desea ver los locales guardados hasta el momento?')
+        if confirm.lower() == 'si' and T != 0:
+            for i in range(quantityOfLocals):
+                print(f"============ LOCAL Nº {str(i)} ============")
+                print(f'Codigo local: {local.codLocal}\nNombre: {local.nombreLocal.strip()}\nUbicacion: {local.ubicacionLocal.strip()}\nRubro: {local.rubroLocal.strip()}\nEstado: {local.estado} ')
+                print(f"===========================================")
+                local = pickle.load(localsFile)
 
-    if pedirConfirmacion("Desea ver los locales guardados hasta el momento") and lCount > 0:
-        for local in range(0, lCount):
-            print("Local " + str(local) + ") nombre: " + LOCALES[local][0] + ", ubicacion: " + LOCALES[local][1] + ", rubro: " + LOCALES[local][2] + " - Estado: " + LOCALES[local][3] + ", codigo del local: " + str(LOCALES_CODE[local][0]) + ", codigo del dueño: " + str(LOCALES_CODE[local][1]))
+# funcion para ordenar locales por nombre
+def orderLocalsByName():
+    fileSize = os.path.getsize(localsFilePath)
+    localsFile.seek (0, 0)
+    _ = pickle.load(localsFile)
+    regSize = localsFile.tell() 
+    total = int(fileSize / regSize)  
 
-def ordenarAlfabeticamente():
-    global LOCALES
-    global LOCALES_CODE
-    global lCount
+    if total > 1:
+        for lNum in range (0, total - 1): 
+            for lNumS in range(lNum + 1, total):
+                localsFile.seek(lNum*regSize, 0)
+                aux1 = pickle.load(localsFile)
+                localsFile.seek(lNumS*regSize, 0)
+                aux2 = pickle.load(localsFile)
 
-    if lCount > 1:
-        for lNum in range (0, lCount - 1): 
-            for lNumS in range(lNum + 1, lCount):
-                if (LOCALES[lNum][0] > LOCALES[lNumS][0]):
-                    auxLocales = LOCALES[lNum]
-                    auxLocalesCode = LOCALES_CODE[lNum]
-        
-                    LOCALES[lNum] = LOCALES[lNumS] 
-                    LOCALES_CODE[lNum] = LOCALES_CODE[lNumS] 
-        
-                    LOCALES[lNumS] = auxLocales
-                    LOCALES_CODE[lNumS] = auxLocalesCode
+                if (aux1.nombreLocal > aux2.nombreLocal):
+                    localsFile.seek(lNum*regSize, 0)
+                    pickle.dump(aux2, localsFile)
+                    localsFile.seek(lNumS*regSize, 0)
+                    pickle.dump(aux1, localsFile)
+                    localsFile.flush()
 
-def conseguirIndiceRub(rub): # parametro rub de tipo STRING, retorna un INT
-    global lRubs
+# funcion para el index de la categoria
+def getCategoryIndex(rub): # parametro rub de tipo STRING, retorna un INT
+    global lCategories
     founded = False
     rubIdx = 0
-    while (not founded and rubIdx <= len(lRubs) - 1):
-        if lRubs[rubIdx] == rub:
+    while (not founded and rubIdx <= len(lCategories) - 1):
+        if lCategories[rubIdx] == rub:
             founded = True
         else:
             rubIdx += 1
     
     return rubIdx
 
+# funcion para añadir uno a la cuenta de la categoria
+def addToCategory(cat):
+    global lCategoriesCount
+    lCategoriesCount[getCategoryIndex(cat)] += 1
+
+# funcion para restar uno a la cuenta de la categoria
+def removeFromCategory(cat):
+    global lCategoriesCount
+    lCategoriesCount[getCategoryIndex(cat)] +- 1
 
 # Function para registrar locales
-def registroLocales():
+def newLocals():
     os.system('cls')
-    global lCount
-    global lRubs
-    global LOCALES
-    global LOCALES_CODE
+    global lCategories
     
-    lName = input("[?] Ingrese el nombre del local (ingrese \".\" para salir)\n")
+    localsFile.seek(0,0)
+    locals = Locales()
+    locals = pickle.load(localsFile)
+    locals.nombreLocal = input("[?] Ingrese el nombre del local (ingrese \".\" para salir)\n")
 
-    while lName != ".":
-        while nombreInvalido(lName):
+    # Se saca el número de locales para poder poner el codigo de del mismo de manera secuencial
+    localQty = getLocalsQuantity()
+    registeredLocals = 0
+
+    while locals.nombreLocal != ".":
+        while invalidLocalName(lName):
             print("[-] Nombre de local en uso")
-            lName = input("[?] Ingrese el nombre del local\n")
+            locals.nombreLocal = input("[?] Ingrese el nombre del local\n")
 
-        lAddress = input("[?] Ingrese la ubicacion del local\n")
+        locals.ubicacionLocal = input("[?] Ingrese la ubicacion del local\n")
+        locals.codLocal = localQty + 1
+        registeredLocals = registeredLocals + 1
 
-        lHeading = input("[?] Ingrese el rubro del local\n").lower()
-        while lHeading != "indumentaria" and lHeading != "perfumeria" and lHeading != "comida":
+        locals.rubroLocal = input(f"[?] Ingrese el rubro del local ({LOCAL_TYPE_FASHION}, {LOCAL_TYPE_FOOD}, {LOCAL_TYPE_PERFUME})\n").lower()
+        while locals.rubroLocal != LOCAL_TYPE_FASHION and locals.rubroLocal != LOCAL_TYPE_PERFUME and locals.rubroLocal != LOCAL_TYPE_FOOD:
             print("[-] Rubro invalido")
-            lHeading = input("[?] Ingrese el rubro del local\n").lower()
+            locals.rubroLocal = input(f"[?] Ingrese un rubro de local valido ({LOCAL_TYPE_FASHION}, {LOCAL_TYPE_FOOD}, {LOCAL_TYPE_PERFUME})\n").lower()
 
-        lUserCode = int(input("[?] Ingrese el codigo de usuario del dueño del local\n"))
-        while (not isLocalOwner(lUserCode)):
+        locals.codUsuario = int(input("[?] Ingrese el codigo de usuario del dueño del local\n"))
+        while (searchUserByCode(locals.codUsuario).tipoUsuario != USER_TYPE_LOCALOWNER):
             print("[-] El codigo de usuario ingresado no existe o no pertenece a un dueño de local")
-            lUserCode = int(input("[?] Ingrese el codigo de usuario del dueño del local\n"))
+            locals.codUsuario = int(input("[?] Ingrese el codigo de usuario del dueño del local\n"))
 
-        # Se registra el local
-        LOCALES[lCount] = [lName, lAddress, lHeading, "A"]
-        LOCALES_CODE[lCount] = [lCount + 1, lUserCode]
+        # sumar uno a la categoria
+        addToCategory(locals.rubroLocal)
 
-        lCount = lCount + 1
-        if lHeading == "indumentaria":
-            lRubsCount[conseguirIndiceRub("indumentaria")] += 1
-        elif lHeading == "perfumeria":
-            lRubsCount[conseguirIndiceRub("perfumeria")] += 1
-        else: 
-            lRubsCount[conseguirIndiceRub("comida")] += 1
-
-
+        # Se guarda el nuevo local en archivo con la función "saveLocal"
+        saveLocal(locals)
+        orderLocalsByName()
 
         os.system('cls')
         lName = input("[?] Ingrese el nombre del siguiente local (ingrese \".\" para salir)\n")
 
     #valida que al menos se haya ejecutado una vez el while
-    if lCount > 0:
-        # Si se ingresaron al menos dos locales se los ordena alfabeticamente
-        ordenarAlfabeticamente()
-        ordenarRubros()
+    if registeredLocals > 0:
+        # Si se ingreso al menos un local nuevo se reordenan las categorias
+        orderCategories()
 
         os.system('cls')
         print("[+] Locales por rubro: ")
 
-        for rubro in range(0, len(lRubs)):
-            print(" " + lRubs[rubro] + ": " + str(lRubsCount[rubro]))
-
-def conseguirIndiceLocal(code): #parametro code tipo INT
-    global lCount
-    global LOCALES_CODE
-    founded = False
-
-    if code <= 0 or code > lCount:
-        return -1
-
-    count = 0
-    while (count >= 0 and count <= lCount - 1) and not founded:
-        if(LOCALES_CODE[count][0] == code):
-            founded = True;
-        else:
-            count += 1
-
-    if LOCALES_CODE[count][0] == code:
-        return count
-    else:
-        return -1
+        for rubro in range(0, len(lCategories)):
+            print(" " + lCategories[rubro] + ": " + str(lCategoriesCount[rubro]))
 
 
 def pedirConfirmacion(texto): #parametro localIndex tipo INT y parametro texto de tipo STRING
@@ -389,85 +465,78 @@ def pedirConfirmacion(texto): #parametro localIndex tipo INT y parametro texto d
 
     return opt == "s"
 
-def activarLocalPrompt(localIndex): #parametro localIndex tipo INT
-    global LOCALES
+def activarLocalPrompt(localData, posL): #parametro localIndex tipo INT
     if pedirConfirmacion("Desea activar nuevamente este local"):
-        LOCALES[localIndex][3] = 'A'
+        localData.estado = 'A'
+        localsFile.seek(posL,0)
+        pickle.dump(localData, localsFile)
+        localsFile.flush()
 
-def desactivarLocalPrompt(localIndex): #parametro localIndex tipo INT
-    global LOCALES
+
+def desactivarLocalPrompt(localData, posL): #parametro localIndex tipo INT
     if pedirConfirmacion("Desea eliminar este local"):
-        LOCALES[localIndex][3] = 'B'
+        localData.estado = 'B'
+        localsFile.seek(posL,0)
+        pickle.dump(localData, localsFile)
+        localsFile.flush()
 
-
-def localActivo(localIndex): #parametro localIndex tipo INT
-    global LOCALES
-    return LOCALES[localIndex][3] == 'A'
-
-def modificarLocal():
-    global LOCALES
-    global LOCALES_CODE
-    global lRubs
-
+def modifyLocal():
     lCode = input("[?] Ingrese el codigo del local\n")
-    localIndex = conseguirIndiceLocal(int(lCode))
+    localData, pos = searchLocalByCode(int(lCode))
 
-    while localIndex == -1:
+    while pos == -1:
         print("[-] Codigo de local invalido")
         lCode = input("[?] Ingrese el codigo del local\n")
-        localIndex = conseguirIndiceLocal(int(lCode))
+        localData, pos = searchLocalByCode(int(lCode))
 
-    if not localActivo(localIndex):
-        activarLocalPrompt(localIndex)
+    localsFile.seek(pos,0)
+
+    if localData.estado != "A":
+        activarLocalPrompt(localData, pos)
     
-    if localActivo(localIndex):
-        lName = input("[?] Ingrese el nombre del local (ingrese \".\" para salir)\n")
+    if localData.estado == "A":
+        localData.nombreLocal = input("[?] Ingrese el nombre del local (ingrese \".\" para salir)\n")
 
-        while nombreInvalido(lName):
+        while invalidLocalName(localData.nombreLocal):
             print("[-] Nombre de local en uso")
-            lName = input("[?] Ingrese el nombre del local\n")
+            localData.nombreLocal = input("[?] Ingrese el nombre del local\n")
 
-        lAddress = input("[?] Ingrese la ubicacion del local\n")
+        localData.ubicacionLocal = input("[?] Ingrese la ubicacion del local\n")
 
-        lHeading = input("[?] Ingrese el rubro del local\n").lower()
-        while lHeading != "indumentaria" and lHeading != "perfumeria" and lHeading != "comida":
+        r = input("[?] Ingrese el rubro del local\n").lower()
+        while r != LOCAL_TYPE_FASHION and r != LOCAL_TYPE_FOOD and r != LOCAL_TYPE_PERFUME:
             print("[-] Rubro invalido")
-            lHeading = input("[?] Ingrese el rubro del local\n").lower()
+            r = input("[?] Ingrese el rubro del local\n").lower()
 
-        lUserCode = int(input("[?] Ingrese el codigo de usuario del dueño del local\n"))
-        while (not isLocalOwner(lUserCode)):
+        localData.codUsuario = int(input("[?] Ingrese el codigo de usuario del dueño del local\n"))
+        while (searchUserByCode(localData.codUsuario).tipoUsuario != USER_TYPE_LOCALOWNER):
             print("[-] El codigo de usuario ingresado no existe o no pertenece a un dueño de local")
-            lUserCode = int(input("[?] Ingrese el codigo de usuario del dueño del local\n"))
+            localData.codUsuario = int(input("[?] Ingrese el codigo de usuario del dueño del local\n"))
 
         # Si se modifica el rubro, se resta uno al actual y se suma uno al nuevo
-        if LOCALES[localIndex][2] != lHeading:
-            lRubsCount[conseguirIndiceRub(LOCALES[localIndex][2])] -= 1
-
-            if lHeading == "indumentaria":
-                lRubsCount[conseguirIndiceRub("indumentaria")] += 1
-            elif lHeading == "perfumeria":
-                lRubsCount[conseguirIndiceRub("perfumeria")] += 1
-            else: 
-                lRubsCount[conseguirIndiceRub("comida")] += 1
+        if r != localData.rubroLocal:
+            removeFromCategory(localData.rubroLocal)
+            localData.rubroLocal = r
+            addToCategory(localData.rubroLocal)
 
         
         LOCALES[localIndex] = [lName, lAddress, lHeading, "A"]
         LOCALES_CODE[localIndex] = [LOCALES_CODE[localIndex][0], lUserCode]
         
-        ordenarRubros()
-        ordenarAlfabeticamente()
+        orderCategories()
+        orderLocalsByName()
 
 def eliminarLocal():
     global LOCALES
     global LOCALES_CODE
 
     lCode = input("[?] Ingrese el codigo del local\n")
-    localIndex = conseguirIndiceLocal(int(lCode))
+    localIndex = searchLocalByCode(int(lCode))
 
     while localIndex == -1:
         print("[-] Codigo de local invalido")
         lCode = input("[?] Ingrese el codigo del local\n")
-        localIndex = conseguirIndiceLocal(int(lCode))
+        localIndex = searchLocalByCode(int(lCode))
 
     if not localActivo(localIndex):
         print("[-] Este local ya fue dado de baja")
@@ -496,7 +565,8 @@ def mapaLocales():
     print("+--+--+--+--+--+")
     
 # Funcion que muestra el menu de Gestion de locales
-def gestionLocales():
+def localManage():
+    
     print('''
 a) Crear locales
 b) Modificar local
@@ -514,13 +584,13 @@ e) Volver
 
         match ord(opcion):
             case 97:
-                verLocalesPrompt()
-                registroLocales()
+                listLocals()
+                NewLocals()
             case 98:
-                verLocalesPrompt()
-                modificarLocal()
+                listLocals()
+                modifyLocal()
             case 99:
-                verLocalesPrompt()
+                listLocals()
                 eliminarLocal()
             case 100: 
                 mapaLocales()
@@ -536,7 +606,7 @@ e) Volver
     
 
 # Funcion que se encarga de mostrar el menu de Gestion de novedades
-def gestionNovedades():
+def newsManage():
     print('''
 a) Crear novedades
 b) Modificar novedad
@@ -566,14 +636,14 @@ e) Volver
 
 
 # Funcion que se encarga del menu principal
-def menuPrincipal():
+def adminMenu():
     print('''
 1. Gestion de locales
 2. Crear cuentas de dueños de locales
 3. Aprobar / Denegarsolicitud de descuento
 4. Gestión de novedades
 5. Reporte de utilización de descuentos
-0. Salir
+0. Salir·
     ''')
 
     opcion = int(input("[?] Ingrese el indice de la opcion requerida\n"))
@@ -588,7 +658,7 @@ def menuPrincipal():
         match opcion:
             case 1:
                 os.system('cls')
-                gestionLocales()
+                localManage()
             case 2:
                 os.system('cls')
                 print("[-] En construccion...")
@@ -597,7 +667,7 @@ def menuPrincipal():
                 print("[-] En construccion...")
             case 4:
                 os.system('cls')
-                gestionNovedades()
+                newsManage()
             case 5:
                 os.system('cls')
                 print("[-] En construccion...")
@@ -687,20 +757,18 @@ def menuCliente():
     print("[-] El programa ha finalizado")
 
 # funcion que retorna un booleano dependiendo si el usuario ingresado existe
-def loginValido(user, passwd): # parametro user y passwd de tipo string
-    global USERS
-    global MY_USER_INDEX
-
+def loginValido(mail, passwd): # parametro mail y passwd de tipo string
+    global MY_USER
     logged = False
-    uIndex = 0
 
-    # Recorremos los usuarios hasta terminarlos o hasta encontrar el que fue usado
-    while (not logged and uIndex <= 3):
-        if USERS[uIndex][0] == user and USERS[uIndex][1] == passwd:
-            logged = True
-            MY_USER_INDEX = uIndex
-        uIndex = uIndex + 1
-    
+    user = searchUserByMail(mail)
+    if user.nombreUsuario == "":
+        return logged
+
+    if user.claveUsuario == passwd.strip():
+        logged = True
+        MY_USER = user
+
     return logged; 
 
 # Funcion encargada del inicioSesion de usuarios
@@ -723,13 +791,13 @@ def loginUser():
             
         attempts = attempts + 1
 
-    if MY_USER_INDEX != -1:
+    if MY_USER.nombreUsuario != "":
         os.system('cls')
-        account = USERS[MY_USER_INDEX][2]
-        print("[+] Sesion iniciada como " + account)
-        match account:
+        print("[+] Sesion iniciada como " + MY_USER.tipoUsuario)
+        
+        match MY_USER.tipoUsuario.strip():
             case "administrador":
-                menuPrincipal()
+                adminMenu()
             case "dueñoLocal":
                 menuDLocal()
             case "cliente":
@@ -748,5 +816,6 @@ def entryPoint():
         
     loadFiles()
     authMenu()
+    unloadFiles()
 
 entryPoint()
