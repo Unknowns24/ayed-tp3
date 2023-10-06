@@ -8,6 +8,7 @@
 import os
 import pickle
 import os.path
+import time
 import maskpass
 from datetime import date
 
@@ -158,6 +159,8 @@ def parseUser(user):
 
 # funcion para guardar un local en el archivo
 def saveLocal(local):
+    localsFile.seek(0, os.SEEK_END)
+
     local.codLocal = str(local.codLocal).ljust(10)
     local.codUsuario  = str(local.codUsuario).ljust(10)
     local.nombreLocal = local.nombreLocal.ljust(LOCAL_NAME_LENGHT)
@@ -165,6 +168,7 @@ def saveLocal(local):
     local.rubroLocal = local.rubroLocal.ljust(LOCAL_CATG_LENGHT)
 
     pickle.dump(local, localsFile)
+    localsFile.flush()
 
 # funcion para limpiar los valores del local
 def parselocal(local):
@@ -191,15 +195,7 @@ def loadAdmin():
     adminUser.tipoUsuario = USER_TYPE_ADMIN
     adminUser.claveUsuario = "12345"
 
-    #TODO:BORRAR
-    testOwnerUser = Usuario()
-    testOwnerUser.codUsuario = 2
-    testOwnerUser.nombreUsuario = "d"
-    testOwnerUser.tipoUsuario = USER_TYPE_LOCALOWNER
-    testOwnerUser.claveUsuario = "1"
-    
     saveUser(adminUser)
-    saveUser(testOwnerUser)
 
 # funcion para cargar la cantidad de locales por rubro en lCategories
 def loadLocals():
@@ -213,10 +209,14 @@ def loadLocals():
 
 # funcion para leer opciones numericas en rango
 def optionRange(inicio, fin):
-    opc = int(input('Elije una opcion: '))
-    while opc > fin or opc < inicio:
-        opc = int(input('Elije una opcion valida: '))
-    return opc 
+    try:
+        opc = int(input('Elije una opcion: '))
+        while opc > fin or opc < inicio:
+            opc = int(input('Elije una opcion valida: '))
+        return opc 
+    except:
+        return -1
+
 
 # funciones para el menu de autenticacion:FL
 def authMenuOpts():
@@ -227,6 +227,8 @@ def authMenuOpts():
 def authMenu():    
     authMenuOpts()
     opc = optionRange(1,3)
+    while opc == -1:
+        optionRange(1,3)
 
     while opc != 3:
         match opc:
@@ -235,6 +237,8 @@ def authMenu():
         os.system('cls')
         authMenuOpts()
         opc = optionRange(1,3)
+        while opc == -1:
+            optionRange(1,3)
     print('Saliendo...')
 
 # funcion para registrar usuarios
@@ -262,8 +266,30 @@ def registerUser():
 # funciones para buscar un local
 def searchLocalEnginge(code):
     T = os.path.getsize(localsFilePath)
-    pos = -1 
     locals = Locales()
+    localsFound = False
+    localsFile.seek(0,0)
+
+    while not localsFound and localsFile.tell() < T:
+        # lee puntero
+        localsFile.tell()
+
+        # carga contenido
+        tmp = parselocal(pickle.load(localsFile))
+        
+        # chequea si el nombre es igual al mail
+        if tmp.codLocal == code:
+            locals = tmp
+            localsFound = True
+    
+    return locals
+
+def searchLocalByCode(code):
+    return searchLocalEnginge(code)
+
+def getLocalPosByCode(code):
+    T = os.path.getsize(localsFilePath)
+    pos = -1 
     localsFound = False
     localsFile.seek(0,0)
 
@@ -272,18 +298,14 @@ def searchLocalEnginge(code):
         p = localsFile.tell()
 
         # carga contenido
-        tmp = pickle.load(localsFile)
+        tmp = parselocal(pickle.load(localsFile))
         
         # chequea si el nombre es igual al mail
         if tmp.codLocal == code:
             pos = p
-            locals = parselocal(tmp)
             localsFound = True
     
-    return locals, pos
-
-def searchLocalByCode(code):
-    return searchLocalEnginge(code)
+    return pos
 
 # funciones para buscar un usuario en base a ciertos datos
 def searchUserEnginge(mail, code):
@@ -398,7 +420,7 @@ def listLocals():
             for i in range(quantityOfLocals):
                 print(f"============ LOCAL Nº {str(i)} ============")
                 print(f'Codigo local: {local.codLocal}, Nombre: {local.nombreLocal}, Ubicacion: {local.ubicacionLocal}, Rubro: {local.rubroLocal}, Estado: {local.estado} ')
-                print(f"====================================")
+                print(f"====================================\n")
                 if i < quantityOfLocals - 1:
                     local = parselocal(pickle.load(localsFile))
             _ = input("[?] Presione cualquier tecla para continuar")
@@ -486,6 +508,7 @@ def newLocals():
 
         # Se guarda el nuevo local en archivo con la función "saveLocal"
         saveLocal(local)
+        time.sleep(1)
         orderLocalsByName()
 
         os.system('cls')
@@ -505,7 +528,6 @@ def newLocals():
         for rubro in range(0, len(lCategories)):
             print(" " + lCategories[rubro] + ": " + str(lCategoriesCount[rubro]))
 
-
 def askConfirm(texto): #parametro localIndex tipo INT y parametro texto de tipo STRING
     opt = input("[?] " + texto + " (S - si, N - no)\n").lower()
     while opt != "s" and opt != "n":
@@ -521,7 +543,6 @@ def enableLocalPrompt(localData, posL): #parametro localIndex tipo INT
         pickle.dump(localData, localsFile)
         localsFile.flush()
 
-
 def disableLocalPrompt(localData, posL): #parametro localIndex tipo INT
     if askConfirm("Desea eliminar este local"):
         localData.estado = 'B'
@@ -531,12 +552,14 @@ def disableLocalPrompt(localData, posL): #parametro localIndex tipo INT
 
 def modifyLocal():
     lCode = input("[?] Ingrese el codigo del local\n")
-    localData, pos = searchLocalByCode(int(lCode))
+    pos = getLocalPosByCode(int(lCode))
 
     while pos == -1:
         print("[-] Codigo de local invalido")
         lCode = input("[?] Ingrese el codigo del local\n")
-        localData, pos = searchLocalByCode(int(lCode))
+        pos = getLocalPosByCode(int(lCode))
+
+    localData = searchLocalByCode(int(lCode))
 
     localsFile.seek(pos,0)
 
@@ -568,8 +591,9 @@ def modifyLocal():
             localData.rubroLocal = r
             addToCategory(localData.rubroLocal)
 
-        
-        
+        localsFile.seek(pos, 0)
+        pickle.dump(localData, localsFile)
+
         orderCategories()
         orderLocalsByName()
 
