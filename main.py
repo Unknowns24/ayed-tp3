@@ -5,6 +5,7 @@
 # Finelli, Constantino
 # Costamagna Mayol, Ricardo Luis 
 
+import json
 import os
 import pickle
 import os.path
@@ -578,51 +579,51 @@ def modifyLocal():
     
     if localData.estado == "A":
         localData.nombreLocal = input("[?] Ingrese el nombre del local (ingrese \".\" para salir)\n")
+        
+        if localData.nombreLocal != ".":
+            while invalidLocalName(localData.nombreLocal):
+                print("[-] Nombre de local en uso")
+                localData.nombreLocal = input("[?] Ingrese el nombre del local\n")
 
-        while invalidLocalName(localData.nombreLocal):
-            print("[-] Nombre de local en uso")
-            localData.nombreLocal = input("[?] Ingrese el nombre del local\n")
+            localData.ubicacionLocal = input("[?] Ingrese la ubicacion del local\n")
 
-        localData.ubicacionLocal = input("[?] Ingrese la ubicacion del local\n")
-
-        r = input("[?] Ingrese el rubro del local\n").lower()
-        while r != LOCAL_TYPE_FASHION and r != LOCAL_TYPE_FOOD and r != LOCAL_TYPE_PERFUME:
-            print("[-] Rubro invalido")
             r = input("[?] Ingrese el rubro del local\n").lower()
+            while r != LOCAL_TYPE_FASHION and r != LOCAL_TYPE_FOOD and r != LOCAL_TYPE_PERFUME:
+                print("[-] Rubro invalido")
+                r = input("[?] Ingrese el rubro del local\n").lower()
 
-        localData.codUsuario = int(input("[?] Ingrese el codigo de usuario del dueño del local\n"))
-        while (searchUserByCode(localData.codUsuario).tipoUsuario != USER_TYPE_LOCALOWNER):
-            print("[-] El codigo de usuario ingresado no existe o no pertenece a un dueño de local")
             localData.codUsuario = int(input("[?] Ingrese el codigo de usuario del dueño del local\n"))
+            while (searchUserByCode(localData.codUsuario).tipoUsuario != USER_TYPE_LOCALOWNER):
+                print("[-] El codigo de usuario ingresado no existe o no pertenece a un dueño de local")
+                localData.codUsuario = int(input("[?] Ingrese el codigo de usuario del dueño del local\n"))
 
-        # Si se modifica el rubro, se resta uno al actual y se suma uno al nuevo
-        if r != localData.rubroLocal:
-            removeFromCategory(localData.rubroLocal)
-            localData.rubroLocal = r
-            addToCategory(localData.rubroLocal)
+            # Si se modifica el rubro, se resta uno al actual y se suma uno al nuevo
+            if r != localData.rubroLocal:
+                removeFromCategory(localData.rubroLocal)
+                localData.rubroLocal = r
+                addToCategory(localData.rubroLocal)
 
-        saveLocal(localData, pos)
+            saveLocal(localData, pos)
 
-        orderCategories()
-        orderLocalsByName()
+            orderCategories()
+            orderLocalsByName()
 
 def deleteLocal():
-    global LOCALES
-    global LOCALES_CODE
-
     lCode = input("[?] Ingrese el codigo del local\n")
-    local, pos = searchLocalByCode(int(lCode))
+    pos = getLocalPosByCode(int(lCode))
 
     while pos == -1:
         print("[-] Codigo de local invalido")
         lCode = input("[?] Ingrese el codigo del local\n")
-        local, pos = searchLocalByCode(int(lCode))
+        pos = getLocalPosByCode(int(lCode))
 
-    if local.codLocal != 'A':
+    localData = searchLocalByCode(int(lCode))
+
+    if localData.estado != 'A':
         print("[-] Este local ya fue dado de baja")
 
-    if local.codLocal != 'A':
-        disableLocalPrompt(local, pos)
+    if localData.estado == 'A':
+        disableLocalPrompt(localData, pos)
         print("[+] Local eliminado")
     
 def mapaLocales():
