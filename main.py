@@ -5,13 +5,13 @@
 # Finelli, Constantino
 # Costamagna Mayol, Ricardo Luis 
 
-import json
 import os
 import pickle
 import os.path
 import time
 import maskpass
 from datetime import date
+from datetime import datetime
 
 #**********#
 #* CLASES *#
@@ -37,7 +37,7 @@ class Promocion:
         self.textoPromo = ""
         self.fechaDesdePromo = date
         self.fechaHastaPromo = date
-        self.diasSemana = [""]*6
+        self.diasSemana = [0]*6
         self.estado  = ""
         self.codLocal = 0
 class UsoPromocion:
@@ -83,6 +83,17 @@ LOCAL_TYPE_FOOD = "comida"
 LOCAL_TYPE_PERFUME = "perfumeria"
 LOCAL_TYPE_FASHION = "indumentaria"
 
+# Declaramos las "variables" de los estados de los descuentos
+DISCOUNT_STATUS_PENDING="pendiente"
+DISCOUNT_STATUS_APPROVED="aceptada"
+DISCOUNT_STATUS_REJECTED="rechazada"
+
+# Declaramos "variable" para los dias de la semana
+DAYS=["Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo"]
+
+# Declaramos "variable" para el comando clear
+CLEAR_COMMAND = "cls"
+
 # Declaramos la variable donde se guardaran el usuario y contraseña correctas
 attempts = 0 # Variable tipo INT
 
@@ -117,10 +128,25 @@ def openFile(filePath):
 
     return logicFile
 
+# funcion para setear paths si estas en mac
+def setPath():
+    global mainPath, userFilePath, localsFilePath, promsFilePath, promsUseFilePath, newsFilePath, CLEAR_COMMAND
+
+    CLEAR_COMMAND = "clear"
+
+    if os.name == "posix":
+        mainPath = "./files/"
+        userFilePath = mainPath+"usuarios.dat"
+        localsFilePath = mainPath+"locales.dat"
+        promsFilePath = mainPath+"promociones.dat"
+        promsUseFilePath = mainPath+"uso_promociones.dat"
+        newsFilePath = mainPath+"novedades.dat" 
+
+
 # funcion para cargar archivos
 def loadFiles():
     global userFile, localsFile, promsFile, promsUseFile, newsFile
-    
+
     # crea la carpeta del tp3 si no existe 
     os.makedirs(mainPath, 775, True)
 
@@ -146,6 +172,8 @@ def unloadFiles():
 
 # funcion para guardar un usuario en el archivo
 def saveUser(user):
+    userFile.seek(0, os.SEEK_END)
+
     user.codUsuario = str(user.codUsuario).ljust(10)
     user.tipoUsuario = user.tipoUsuario.ljust(USER_TYPE_LENGHT)
     user.claveUsuario = user.claveUsuario.ljust(USER_PASS_LENGHT)
@@ -189,12 +217,27 @@ def parselocal(local):
 
     return local
 
-# funcion para guardar una novedad en el archivo
-def saveNew(new):
-    new.textoNovedad = new.textoNovedad.ljust(NEW_TEXT_LENGHT)
-    new.tipoUsuario = new.tipoUsuario.ljust(NEW_TYPE_LENGHT)
-    pickle.dump(new, newsFile)
-    newsFile.flush()
+# funcion para guardar promocion en el archivo
+def saveProm(prom):
+    promsFile.seek(0, os.SEEK_END)
+
+    prom.codPromo = str(prom.codPromo).ljust(10)
+    prom.textoPromo = prom.textoPromo.ljust(200)
+    prom.fechaDesdePromo = prom.fechaDesdePromo.ljust(10)
+    prom.fechaHastaPromo = prom.fechaHastaPromo.ljust(10)
+    prom.codLocal = str(prom.codLocal).ljust(10)
+
+    pickle.dump(prom, promsFile)
+    promsFile.flush()
+
+# funcion para limpiar los valores de la promocion
+def parseProm(prom):
+    prom.codPromo = int(prom.codPromo)
+    prom.textoPromo = prom.textoPromo.strip()
+    prom.fechaDesdePromo = prom.fechaDesdePromo.strip()
+    prom.fechaHastaPromo = prom.fechaHastaPromo.strip()
+    prom.codLocal = int(prom.codLocal)
+
 
 # funcion para la carga de usuario
 def loadAdmin():
@@ -217,15 +260,21 @@ def loadLocals():
         addToCategory(local.rubroLocal)
 
 # funcion para leer opciones numericas en rango
-def optionRange(inicio, fin):
+def askValidOption(start, end):
+    o = optionRange(start, end)
+    while o == -1:
+        o = optionRange(start, end)
+    
+    return o
+
+def optionRange(start, end):
     try:
-        opc = int(input('Elije una opcion: '))
-        while opc > fin or opc < inicio:
-            opc = int(input('Elije una opcion valida: '))
+        opc = int(input('[?] Ingrese el indice de la opcion requerida\n'))
+        while opc > end or opc < start:
+            opc = int(input('[?] Ingrese un indice de opcion valido\n'))
         return opc 
     except:
         return -1
-
 
 # funciones para el menu de autenticacion:FL
 def authMenuOpts():
@@ -235,26 +284,23 @@ def authMenuOpts():
 
 def authMenu():    
     authMenuOpts()
-    opc = optionRange(1,3)
-    while opc == -1:
-        optionRange(1,3)
+    opc = askValidOption(1, 3)
 
     while opc != 3:
         match opc:
             case 1: loginUser()
             case 2: registerUser(USER_TYPE_CLIENT) 
-        os.system('cls')
+        os.system(CLEAR_COMMAND)
         authMenuOpts()
-        opc = optionRange(1,3)
-        while opc == -1:
-            optionRange(1,3)
-    print('Saliendo...')
+        opc = askValidOption(1, 3)
 
 # funcion para registrar usuarios
 def registerUser(uType):
     user = Usuario()
     mail = input('Ingrese un mail: ')
     invLenghtPromptText = 'Has superado el limite de caracteres('+ str(USER_NAME_LENGHT) +'), ingrese un mail valido: '
+
+    user.codUsuario = codeGenerator(userFilePath, userFile)
 
     while searchUserByMail(mail).nombreUsuario != "" or len(mail) > USER_NAME_LENGHT:
         while len(mail) > USER_NAME_LENGHT:
@@ -347,20 +393,6 @@ def searchUserByMail(mail):
 def searchUserByCode(code):
     return searchUserEnginge("", code)
 
-# funcion para conseguir la cantidad de locales
-def getLocalsQuantity():    
-    total = 0    
-    fileSize = os.path.getsize(localsFilePath)
-    localsFile.seek(0, 0)
-    if fileSize > 0:
-        _ = pickle.load(localsFile)        
-    singleT = localsFile.tell()
-    
-    if singleT != 0:
-        total = fileSize // singleT
-
-    return total
-
 # funcion para validar si el nombre del local es valido
 def invalidLocalName(nombre):
     total = 0
@@ -439,13 +471,26 @@ def listLocals():
             _ = input("[?] Presione cualquier tecla para continuar")
     
 
+#Procedimiento para conseguir el codigo del usuario, el cual se va poniendo de manera secuencial
+def codeGenerator(filePath, file):
+    T = os.path.getsize(filePath)
+    if T == 0:
+        return 1
+    else:
+        file.seek(0,0)
+        pickle.load(file)
+        singleT = file.tell()
+        cant = T // singleT
+        userFile.seek(0,2)
+        return (cant + 1)
+
 # funcion para ordenar locales por nombre
 def orderLocalsByName():
     fileSize = os.path.getsize(localsFilePath)
     localsFile.seek (0, 0)
     _ = pickle.load(localsFile)
     regSize = localsFile.tell() 
-    total = int(fileSize / regSize)  
+    total = int(fileSize / regSize)
 
     if total > 1:
         for lNum in range (0, total - 1): 
@@ -485,17 +530,15 @@ def removeFromCategory(cat):
 
 # Function para registrar locales
 def newLocals():
-    os.system('cls')
+    os.system(CLEAR_COMMAND)
     
     lName = input("[?] Ingrese el nombre del local (ingrese \".\" para salir)\n")
 
     # Se saca el número de locales para poder poner el codigo de del mismo de manera secuencial
-    localQty = getLocalsQuantity()
     registeredLocals = 0
 
     while lName != ".":
         local = Locales()
-        localQty = localQty + 1
         registeredLocals = registeredLocals + 1
 
         while invalidLocalName(lName):
@@ -503,8 +546,8 @@ def newLocals():
             lName = input("[?] Ingrese el nombre del local\n")
 
         local.nombreLocal = lName
+        local.codLocal = codeGenerator(localsFilePath, localsFile)
         local.ubicacionLocal = input("[?] Ingrese la ubicacion del local\n")
-        local.codLocal = localQty
         
         local.rubroLocal = input(f"[?] Ingrese el rubro del local ({LOCAL_TYPE_FASHION}, {LOCAL_TYPE_FOOD}, {LOCAL_TYPE_PERFUME})\n").lower()
         while local.rubroLocal != LOCAL_TYPE_FASHION and local.rubroLocal != LOCAL_TYPE_PERFUME and local.rubroLocal != LOCAL_TYPE_FOOD:
@@ -521,10 +564,9 @@ def newLocals():
 
         # Se guarda el nuevo local en archivo con la función "saveLocal"
         saveLocal(local, 0)
-        time.sleep(1)
         orderLocalsByName()
 
-        os.system('cls')
+        os.system(CLEAR_COMMAND)
         lName = input("[?] Ingrese el nombre del siguiente local (ingrese \".\" para salir)\n")
     
     # flush file
@@ -535,7 +577,7 @@ def newLocals():
         # Si se ingreso al menos un local nuevo se reordenan las categorias
         orderCategories()
 
-        os.system('cls')
+        os.system(CLEAR_COMMAND)
         print("[+] Locales por rubro: ")
 
         for rubro in range(0, len(lCategories)):
@@ -658,17 +700,16 @@ def localMaps():
     if total > 50:
         print("proximamente se habilitara un mapa con los demas locales")
 
-
 # Funcion que muestra el menu de Gestion de locales
-def localManage():
-    print('''
-a) Crear locales
-b) Modificar local
-c) Eliminar local
-d) Mapa de locales
-e) Volver
-    ''')
+def localManageMenuOpts():
+    print("a) Crear locales")
+    print("b) Modificar local")
+    print("c) Eliminar local")
+    print("d) Mapa de locales")
+    print("e) Volver")
 
+def localManage():
+    localManageMenuOpts()
     opcion = input("[?] Ingrese el indice de la opcion requerida\n").lower()
 
     while opcion == "" or ord(opcion) != 101: # cuando la opcion sea distinta de E 
@@ -689,26 +730,19 @@ e) Volver
             case 100: 
                 localMaps()
         
-        print('''
-a) Crear locales
-b) Modificar local
-c) Eliminar local
-d) Mapa de locales
-e) Volver
-        ''')
+        localManageMenuOpts()
         opcion = input("[?] Ingrese el indice de la opcion requerida\n").lower()
-    
 
 # Funcion que se encarga de mostrar el menu de Gestion de novedades
-def newsManage():
-    print('''
-a) Crear novedades
-b) Modificar novedad
-c) Eliminar novedad
-d) Ver reporte de novedades
-e) Volver
-    ''')
+def newsManageMenuOpts():
+    print("a) Crear novedades")
+    print("b) Modificar novedad")
+    print("c) Eliminar novedad")
+    print("d) Ver reporte de novedades")
+    print("e) Volver")
 
+def newsManage():
+    newsManageMenuOpts()
     opcion = input("[?] Ingrese el indice de la opcion requerida\n").lower()
     
     while opcion == "" or ord(opcion) != 101: # cuando la opcion sea distinta de E 
@@ -716,117 +750,75 @@ e) Volver
             print("[-] La opcion ingresada no es valida")
             opcion = input("[?] Ingrese el indice de la opcion requerida\n").lower()
 
-        match ord(opcion):
-            case 97:
-                print("[-] En construccion...")
-            case 98:
-                print("[-] En construccion...")
-            case 99:
-                print("[-] En construccion...")
-            case 100:
-                print("[-] En construccion...")
-        
+        print("[-] Diagramado en chapin...")
+        newsManageMenuOpts()
         opcion = input("[?] Ingrese el indice de la opcion requerida\n").lower()
 
-
 # Funcion que se encarga del menu principal
+def adminMenuOpts():
+    print("1. Gestion de locales")
+    print("2. Crear cuentas de dueños de locales")
+    print("3. Aprobar / Denegarsolicitud de descuento")
+    print("4. Gestión de novedades")
+    print("5. Reporte de utilización de descuentos")
+    print("0. Cerrar sesion")
+    
 def adminMenu():
-    print('''
-1. Gestion de locales
-2. Crear cuentas de dueños de locales
-3. Aprobar / Denegarsolicitud de descuento
-4. Gestión de novedades
-5. Reporte de utilización de descuentos
-0. Salir·
-    ''')
-
-    opcion = int(input("[?] Ingrese el indice de la opcion requerida\n"))
+    adminMenuOpts()
+    opcion = askValidOption(0, 5)
 
     while opcion != 0:
-        # Creamos un bucle que pida nuevamente la opcion en caso de que 
-        # sea incorrecta hasta que una opcion valida sea ingresada.
-        while (opcion < 0 or opcion > 5):
-            print("[-] La opcion ingresada no es valida")
-            opcion = input("[?] Ingrese el indice de la opcion requerida\n")
-
         match opcion:
             case 1:
-                os.system('cls')
+                os.system(CLEAR_COMMAND)
                 localManage()
             case 2:
-                os.system('cls')
+                os.system(CLEAR_COMMAND)
                 registerUser(USER_TYPE_LOCALOWNER)
             case 3:
-                os.system('cls')
+                os.system(CLEAR_COMMAND)
                 print("[-] En construccion...")
             case 4:
-                os.system('cls')
+                os.system(CLEAR_COMMAND)
                 newsManage()
             case 5:
-                os.system('cls')
+                os.system(CLEAR_COMMAND)
                 print("[-] En construccion...")
 
-        print('''
-1. Gestion de locales
-2. Crear cuentas de dueños de locales
-3. Aprobar / Denegarsolicitud de descuento
-4. Gestión de novedades
-5. Reporte de utilización de descuentos
-0. Salir
-        ''')
-        opcion = int(input("[?] Ingrese el indice de la opcion requerida\n"))
-        
-    print("[-] El programa ha finalizado")
+        adminMenuOpts()
+        opcion = askValidOption(0, 5)
 
 # Funcion que se encarga del menu para dueños de local
-def menuDLocal():
-    print('''
-1. Gestión de Descuentos
-    a) Crear descuento para mi local
-    b) Modificardescuentodemilocal
-    c) Eliminar descuento de mi local
-    d) Volver
-2. Aceptar / Rechazar pedido de descuento
-3. Reporte de uso de descuentos
-0. Salir
-    ''')
+def localOwnerMenuOpts():
+    print("1. Crear descuento")
+    print("2. Reporte de uso de descuentos")
+    print("3. Ver novedades")
+    print("0. Cerrar sesion")
 
-    opcion = ord(input("[?] Ingrese el indice de la opcion requerida\n").lower())
+def localOwnerMenu():
+    localOwnerMenuOpts()
+    opc = askValidOption(0, 3)
 
-    while opcion != 48:
-        # Creamos un bucle que pida nuevamente la opcion en caso de que 
-        # sea incorrecta hasta que una opcion valida sea ingresada.
-        while ((opcion < 48 or opcion > 51) and (opcion < 97 or opcion > 100)):
-            print("[-] La opcion ingresada no es valida")
-            opcion = ord(input("[?] Ingrese el indice de la opcion requerida\n")).lower()
+    while opc != 0:
+        os.system(CLEAR_COMMAND)
+        match opc:
+            case 1: createDiscount()
+            case 2: reportOfUsedDiscount()
+            case 3: print("[-] Diagramado en chapin")
 
-        os.system('cls')
-        print("[-] En construccion...")
-
-        print('''
-1. Gestión de Descuentos
-    a) Crear descuento para mi local
-    b) Modificardescuentodemilocal
-    c) Eliminar descuento de mi local
-    d) Volver
-2. Aceptar / Rechazar pedido de descuento
-3. Reporte de uso de descuentos
-0. Salir
-        ''')
-        opcion = ord(input("[?] Ingrese el indice de la opcion requerida\n").lower())
-        
-    print("[-] El programa ha finalizado")
+        localOwnerMenuOpts()
+        opc = askValidOption(0, 3)
 
 # Funcion que se encarga del menu para dueños de local
-def menuCliente():
-    print('''
-1. Registrarme
-2. Buscar descuentos en locales
-3. Solicitar descuento
-4. Ver novedades
-0. Salir
-    ''')
+def clientMenuOpts():
+    print("1. Registrarme")
+    print("2. Buscar descuentos en locales")
+    print("3. Solicitar descuento")
+    print("4. Ver novedades")
+    print("0. Cerrar sesion")
 
+def clientMenu():
+    clientMenuOpts()
     opcion = int(input("[?] Ingrese el indice de la opcion requerida\n"))
 
     while opcion != 0:
@@ -836,16 +828,10 @@ def menuCliente():
             print("[-] La opcion ingresada no es valida")
             opcion = ord(input("[?] Ingrese el indice de la opcion requerida\n"))
 
-        os.system('cls')
+        os.system(CLEAR_COMMAND)
         print("[-] En construccion...")
 
-        print('''
-1. Registrarme
-2. Buscar descuentos en locales
-3. Solicitar descuento
-4. Ver novedades
-0. Salir
-        ''')
+        clientMenuOpts()
         opcion = int(input("[?] Ingrese el indice de la opcion requerida\n"))
         
     print("[-] El programa ha finalizado")
@@ -868,8 +854,7 @@ def validLogin(mail, passwd): # parametro mail y passwd de tipo string
 # Funcion encargada del inicioSesion de usuarios
 def loginUser():
     global attempts
-
-    os.system('cls')
+    os.system(CLEAR_COMMAND)
 
     username = input("[?] Ingrese su nombre de usuario: ")
     password = maskpass.askpass("[?] Ingrese su contraseña: ")
@@ -880,22 +865,86 @@ def loginUser():
             username = input("[?] Ingrese su nombre de usuario: ")
             password = maskpass.askpass("[?] Ingrese su contraseña: ")
         elif attempts >= 3:
-            os.system('cls')
+            os.system(CLEAR_COMMAND)
             print("[-] Demasiados intentos fallidos, el programa se cerrara!")
             
         attempts = attempts + 1
 
     if MY_USER.nombreUsuario != "":
-        os.system('cls')
+        os.system(CLEAR_COMMAND)
         print("[+] Sesion iniciada como " + MY_USER.tipoUsuario)
         
         match MY_USER.tipoUsuario:
             case "administrador":
                 adminMenu()
             case "dueñoLocal":
-                menuDLocal()
+                localOwnerMenu()
             case "cliente":
-                menuCliente()
+                clientMenu()
+
+def createDiscount():
+    disc = Promocion()
+    
+    localCode = int(input('Ingrese un codigo de local para crear un descuento (ingrese 0 para salir): '))
+
+    while localCode != 0:
+        currentL = searchLocalByCode(localCode)
+        
+        while (currentL.codUsuario != MY_USER.codUsuario) and localCode != 0 :
+            localCode = int(input('[?] Ese codigo de local no pertenece a ninguno de tus locales, ingrese uno valido: '))
+            currentL = searchLocalByCode(localCode)
+
+        if currentL.estado != "A":
+            print("[-] Local dado de baja, reactivelo para crear descuentos")
+            localCode = 0
+
+        if localCode != 0:
+            disc.textoPromo = input('[?] Ingrese la descripcion del descuento: ')
+            disc.estado = DISCOUNT_STATUS_PENDING
+            disc.fechaDesdePromo = askDate("[?] Ingrese la fecha de inicio del descuento")
+            disc.fechaHastaPromo = askDate("[?] Ingrese la fecha de finalizacion del descuento")
+
+            while datetime.strptime(disc.fechaDesdePromo, '%d/%m/%Y').timestamp() > datetime.strptime(disc.fechaHastaPromo, '%d/%m/%Y').timestamp(): 
+                print("[-] Fechas de promocion invalida, el inicio no puede ser despues del final")
+                disc.fechaDesdePromo = askDate("[?] Ingrese la fecha de inicio del descuento")
+                disc.fechaHastaPromo = askDate("[?] Ingrese la fecha de finalizacion del descuento")
+
+            disc.codPromo = codeGenerator(promsFilePath, promsFile)
+            
+            for dayIndex in range(0, len(DAYS)):
+                print(f"[?] El descuento es valido el dia {DAYS[dayIndex]}? (1 - si, 0 - no)")
+                valid = askValidOption(0, 1)
+                disc.diasSemana[dayIndex] = valid
+            
+            saveProm(disc)
+            
+            localCode = int(input('Ingrese un codigo de local para crear un descuento(para volver ingrese 0): '))
+ 
+
+def askDate(txt):
+    finalDate = _askDatesLogic(txt)
+    while finalDate == "":
+        print('[-] Usted ha ingresado una fecha invalida, intente de nuevo')
+        finalDate = _askDatesLogic(txt)
+    
+    return finalDate
+
+def _askDatesLogic(txt):
+    try:
+        dateInput = input(f'{txt} (dd/mm/aaaa): ')
+        date = datetime.strptime(dateInput, '%d/%m/%Y')
+
+        if date.timestamp() < date.now().timestamp():
+            print("[-] La fecha no puede ser anterior al dia de hoy")
+            return ""
+
+        return dateInput
+    except ValueError:
+        return ""
+    
+
+def reportOfUsedDiscount():
+    print("TODO:")
 
 # Programa Principal
 def entryPoint():
@@ -908,8 +957,10 @@ def entryPoint():
 ╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚═╝     ╚═╝     ╚═╝╚═╝  ╚═══╝ ╚═════╝ 
     \n''')
         
+    setPath()
     loadFiles()
     authMenu()
+    print("[-] El programa se esta cerrando")
     unloadFiles()
 
 entryPoint()
