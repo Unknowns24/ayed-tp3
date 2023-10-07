@@ -128,13 +128,12 @@ def openFile(filePath):
 
     return logicFile
 
-# funcion para setear paths si estas en mac
+# funcion para setear paths si estas en un sistema posix
 def setPath():
     global mainPath, userFilePath, localsFilePath, promsFilePath, promsUseFilePath, newsFilePath, CLEAR_COMMAND
 
-    CLEAR_COMMAND = "clear"
-
     if os.name == "posix":
+        CLEAR_COMMAND = "clear"
         mainPath = "./files/"
         userFilePath = mainPath+"usuarios.dat"
         localsFilePath = mainPath+"locales.dat"
@@ -238,7 +237,6 @@ def parseProm(prom):
     prom.fechaHastaPromo = prom.fechaHastaPromo.strip()
     prom.codLocal = int(prom.codLocal)
 
-
 # funcion para la carga de usuario
 def loadAdmin():
     adminUser = Usuario()
@@ -300,7 +298,7 @@ def registerUser(uType):
     mail = input('Ingrese un mail: ')
     invLenghtPromptText = 'Has superado el limite de caracteres('+ str(USER_NAME_LENGHT) +'), ingrese un mail valido: '
 
-    user.codUsuario = codeGenerator(userFilePath, userFile)
+    user.codUsuario = getActualRecordsAmount(userFilePath, userFile) + 1
 
     while searchUserByMail(mail).nombreUsuario != "" or len(mail) > USER_NAME_LENGHT:
         while len(mail) > USER_NAME_LENGHT:
@@ -444,18 +442,9 @@ def orderCategories():
 
 # funcion para listar locales
 def listLocals():
-    quantityOfLocals = 0
-    fileSize = os.path.getsize(localsFilePath)
+    quantityOfLocals = getActualRecordsAmount(localsFilePath, localsFile)
     localsFile.seek(0, 0)
     
-    if fileSize > 0:
-        local = parselocal(pickle.load(localsFile))
-    
-    singleT = localsFile.tell()
-
-    if singleT != 0:
-        quantityOfLocals = fileSize // singleT
-
     if quantityOfLocals > 0:
         if askConfirm("Desea ver los locales guardados hasta el momento?"):
             for i in range(quantityOfLocals):
@@ -471,18 +460,17 @@ def listLocals():
             _ = input("[?] Presione cualquier tecla para continuar")
     
 
-#Procedimiento para conseguir el codigo del usuario, el cual se va poniendo de manera secuencial
-def codeGenerator(filePath, file):
+#Procedimiento para conseguir la cantidad de registros existentes en un determinado archivo
+def getActualRecordsAmount(filePath, file):
     T = os.path.getsize(filePath)
     if T == 0:
-        return 1
+        return 0
     else:
         file.seek(0,0)
         pickle.load(file)
         singleT = file.tell()
         cant = T // singleT
-        userFile.seek(0,2)
-        return (cant + 1)
+        return cant
 
 # funcion para ordenar locales por nombre
 def orderLocalsByName():
@@ -490,7 +478,7 @@ def orderLocalsByName():
     localsFile.seek (0, 0)
     _ = pickle.load(localsFile)
     regSize = localsFile.tell() 
-    total = int(fileSize / regSize)
+    total = int(fileSize // regSize)
 
     if total > 1:
         for lNum in range (0, total - 1): 
@@ -546,7 +534,7 @@ def newLocals():
             lName = input("[?] Ingrese el nombre del local\n")
 
         local.nombreLocal = lName
-        local.codLocal = codeGenerator(localsFilePath, localsFile)
+        local.codLocal = getActualRecordsAmount(localsFilePath, localsFile) + 1
         local.ubicacionLocal = input("[?] Ingrese la ubicacion del local\n")
         
         local.rubroLocal = input(f"[?] Ingrese el rubro del local ({LOCAL_TYPE_FASHION}, {LOCAL_TYPE_FOOD}, {LOCAL_TYPE_PERFUME})\n").lower()
@@ -811,28 +799,22 @@ def localOwnerMenu():
 
 # Funcion que se encarga del menu para dueños de local
 def clientMenuOpts():
-    print("1. Registrarme")
-    print("2. Buscar descuentos en locales")
-    print("3. Solicitar descuento")
-    print("4. Ver novedades")
+    print("1. Buscar descuentos en locales")
+    print("2. Solicitar descuento")
+    print("3. Ver novedades")
     print("0. Cerrar sesion")
 
 def clientMenu():
     clientMenuOpts()
-    opcion = int(input("[?] Ingrese el indice de la opcion requerida\n"))
+    opcion = askValidOption(0, 3)
 
     while opcion != 0:
-        # Creamos un bucle que pida nuevamente la opcion en caso de que 
-        # sea incorrecta hasta que una opcion valida sea ingresada.
-        while (opcion < 0 or opcion > 4):
-            print("[-] La opcion ingresada no es valida")
-            opcion = ord(input("[?] Ingrese el indice de la opcion requerida\n"))
-
         os.system(CLEAR_COMMAND)
         print("[-] En construccion...")
 
         clientMenuOpts()
-        opcion = int(input("[?] Ingrese el indice de la opcion requerida\n"))
+        opcion = askValidOption(0, 3)
+
         
     print("[-] El programa ha finalizado")
 
@@ -885,6 +867,7 @@ def loginUser():
 def createDiscount():
     disc = Promocion()
     
+
     localCode = int(input('Ingrese un codigo de local para crear un descuento (ingrese 0 para salir): '))
 
     while localCode != 0:
@@ -909,7 +892,7 @@ def createDiscount():
                 disc.fechaDesdePromo = askDate("[?] Ingrese la fecha de inicio del descuento")
                 disc.fechaHastaPromo = askDate("[?] Ingrese la fecha de finalizacion del descuento")
 
-            disc.codPromo = codeGenerator(promsFilePath, promsFile)
+            disc.codPromo = getActualRecordsAmount(promsFilePath, promsFile) + 1
             
             for dayIndex in range(0, len(DAYS)):
                 print(f"[?] El descuento es valido el dia {DAYS[dayIndex]}? (1 - si, 0 - no)")
@@ -919,7 +902,16 @@ def createDiscount():
             saveProm(disc)
             
             localCode = int(input('Ingrese un codigo de local para crear un descuento(para volver ingrese 0): '))
- 
+
+def listPromsByLocalOwner():
+    quantityOfReports = getActualRecordsAmount(localsFilePath, localsFile)
+    localsFile.seek(0, 0)
+    
+    if quantityOfReports > 0:
+        for i in range(quantityOfReports):
+            if i < quantityOfReports - 1:
+                report = parselocal(pickle.load(localsFile))
+
 
 def askDate(txt):
     finalDate = _askDatesLogic(txt)
