@@ -55,9 +55,9 @@ class Novedad:
         self.estado = "A"
 
 # Declaramos "variables" que contienen codigo de colores
-ROJO="\033[31m"
-RESET="\033[0m"
-VERDE = "\033[32m"
+COLOR_RED="\033[31m"
+COLOR_RESET="\033[0m"
+COLOR_GREEN = "\033[32m"
 
 # Declaramos "variables" que contienen los tamaños de los campos a utilizar
 USER_NAME_LENGHT = 100
@@ -242,7 +242,7 @@ def authMenu():
     while opc != 3:
         match opc:
             case 1: loginUser()
-            case 2: registerUser() 
+            case 2: registerUser(USER_TYPE_CLIENT) 
         os.system('cls')
         authMenuOpts()
         opc = optionRange(1,3)
@@ -251,9 +251,9 @@ def authMenu():
     print('Saliendo...')
 
 # funcion para registrar usuarios
-def registerUser():
+def registerUser(uType):
     user = Usuario()
-    mail = input('Ingrese su mail: ')
+    mail = input('Ingrese un mail: ')
     invLenghtPromptText = 'Has superado el limite de caracteres('+ str(USER_NAME_LENGHT) +'), ingrese un mail valido: '
 
     while searchUserByMail(mail).nombreUsuario != "" or len(mail) > USER_NAME_LENGHT:
@@ -268,7 +268,7 @@ def registerUser():
     while len(user.claveUsuario) != USER_PASS_LENGHT:
         user.claveUsuario = input('La contraseña que acaba de ingresar no tiene '+str(USER_PASS_LENGHT)+' caracteres, ingrese otra: ')
     
-    user.tipoUsuario = USER_TYPE_CLIENT
+    user.tipoUsuario = uType
     saveUser(user)
     print('Registrado correctamente')
 
@@ -427,13 +427,13 @@ def listLocals():
     if quantityOfLocals > 0:
         if askConfirm("Desea ver los locales guardados hasta el momento?"):
             for i in range(quantityOfLocals):
-                color = VERDE
+                color = COLOR_GREEN
                 if local.estado != "A":
-                    color = ROJO
+                    color = COLOR_RED
 
-                print(f"{color}============ LOCAL Nº {str(i)} ============{RESET}")
+                print(f"{color}============ LOCAL Nº {str(i)} ============{COLOR_RESET}")
                 print(f'Codigo local: {local.codLocal}, Nombre: {local.nombreLocal}, Ubicacion: {local.ubicacionLocal}, Rubro: {local.rubroLocal}, Estado: {local.estado} ')
-                print(f"{color}===================================={RESET}\n")
+                print(f"{color}===================================={COLOR_RESET}\n")
                 if i < quantityOfLocals - 1:
                     local = parselocal(pickle.load(localsFile))
             _ = input("[?] Presione cualquier tecla para continuar")
@@ -547,7 +547,7 @@ def askConfirm(texto): #parametro localIndex tipo INT y parametro texto de tipo 
         print("[-] Opcion invalida")
         opt = input("[?] " + texto + " (S - si, N - no)\n").lower()
 
-    return opt == "s"
+    return opt == "s" or opt == "si"
 
 def enableLocalPrompt(localData, posL): #parametro localIndex tipo INT
     if askConfirm("Desea activar nuevamente este local"):
@@ -639,14 +639,14 @@ def localMaps():
             if local < total:
                 localsFile.seek(local*regSize, 0)
                 l = parselocal(pickle.load(localsFile))
-                color = VERDE
+                color = COLOR_GREEN
                 if l.estado != "A":
-                    color = ROJO
+                    color = COLOR_RED
 
                 if l.codLocal < 10:
-                    lId = color + lId + str(l.codLocal) + RESET
+                    lId = color + lId + str(l.codLocal) + COLOR_RESET
                 else:
-                    lId = color + str(l.codLocal) + RESET
+                    lId = color + str(l.codLocal) + COLOR_RESET
             else:
                 lId = lId +"0"
 
@@ -755,7 +755,7 @@ def adminMenu():
                 localManage()
             case 2:
                 os.system('cls')
-                print("[-] En construccion...")
+                registerUser(USER_TYPE_LOCALOWNER)
             case 3:
                 os.system('cls')
                 print("[-] En construccion...")
