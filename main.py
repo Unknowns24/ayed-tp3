@@ -37,7 +37,7 @@ class Promocion:
         self.textoPromo = ""
         self.fechaDesdePromo = date
         self.fechaHastaPromo = date
-        self.diasSemana = [0]*6
+        self.diasSemana = [0]*7
         self.estado  = ""
         self.codLocal = 0
 class UsoPromocion:
@@ -58,6 +58,7 @@ class Novedad:
 COLOR_RED="\033[31m"
 COLOR_RESET="\033[0m"
 COLOR_GREEN = "\033[32m"
+COLOR_YELLOW = "\033[33m"
 
 # Declaramos "variables" que contienen los tamaños de los campos a utilizar
 USER_NAME_LENGHT = 100
@@ -236,6 +237,8 @@ def parseProm(prom):
     prom.fechaDesdePromo = prom.fechaDesdePromo.strip()
     prom.fechaHastaPromo = prom.fechaHastaPromo.strip()
     prom.codLocal = int(prom.codLocal)
+    
+    return prom
 
 # funcion para la carga de usuario
 def loadAdmin():
@@ -267,7 +270,13 @@ def askValidOption(start, end):
 
 def optionRange(start, end):
     try:
-        opc = int(input('[?] Ingrese el indice de la opcion requerida\n'))
+        opc = input('[?] Ingrese el indice de la opcion requerida\n')
+        
+        if opc == "" or opc == " ":
+            return -1
+        
+        opc = int(opc)
+
         while opc > end or opc < start:
             opc = int(input('[?] Ingrese un indice de opcion valido\n'))
         return opc 
@@ -447,6 +456,8 @@ def listLocals():
     
     if quantityOfLocals > 0:
         if askConfirm("Desea ver los locales guardados hasta el momento?"):
+            local = parselocal(pickle.load(localsFile))
+
             for i in range(quantityOfLocals):
                 color = COLOR_GREEN
                 if local.estado != "A":
@@ -865,8 +876,8 @@ def loginUser():
                 clientMenu()
 
 def createDiscount():
+    listPromsByLocalOwner()
     disc = Promocion()
-    
 
     localCode = int(input('Ingrese un codigo de local para crear un descuento (ingrese 0 para salir): '))
 
@@ -882,12 +893,13 @@ def createDiscount():
             localCode = 0
 
         if localCode != 0:
+            disc.codLocal = localCode
             disc.textoPromo = input('[?] Ingrese la descripcion del descuento: ')
             disc.estado = DISCOUNT_STATUS_PENDING
             disc.fechaDesdePromo = askDate("[?] Ingrese la fecha de inicio del descuento")
             disc.fechaHastaPromo = askDate("[?] Ingrese la fecha de finalizacion del descuento")
 
-            while datetime.strptime(disc.fechaDesdePromo, '%d/%m/%Y').timestamp() > datetime.strptime(disc.fechaHastaPromo, '%d/%m/%Y').timestamp(): 
+            while datetime.strptime(disc.fechaDesdePromo, '%d/%m/%Y').timestamp() >= datetime.strptime(disc.fechaHastaPromo, '%d/%m/%Y').timestamp(): 
                 print("[-] Fechas de promocion invalida, el inicio no puede ser despues del final")
                 disc.fechaDesdePromo = askDate("[?] Ingrese la fecha de inicio del descuento")
                 disc.fechaHastaPromo = askDate("[?] Ingrese la fecha de finalizacion del descuento")
@@ -904,13 +916,30 @@ def createDiscount():
             localCode = int(input('Ingrese un codigo de local para crear un descuento(para volver ingrese 0): '))
 
 def listPromsByLocalOwner():
-    quantityOfReports = getActualRecordsAmount(localsFilePath, localsFile)
-    localsFile.seek(0, 0)
+    quantityOfPromotions = getActualRecordsAmount(promsFilePath, promsFile)
+    promsFile.seek(0, 0)
     
-    if quantityOfReports > 0:
-        for i in range(quantityOfReports):
-            if i < quantityOfReports - 1:
-                report = parselocal(pickle.load(localsFile))
+    if quantityOfPromotions > 0:
+        print("Promociones activas de tus locales: ")
+        for i in range(quantityOfPromotions):
+            if i < quantityOfPromotions:
+                prom = parseProm(pickle.load(promsFile))
+
+                if datetime.strptime(prom.fechaDesdePromo, '%d/%m/%Y').timestamp() <= datetime.now().timestamp() and datetime.strptime(prom.fechaHastaPromo, '%d/%m/%Y').timestamp() >= datetime.now().timestamp():
+                    local = searchLocalByCode(prom.codLocal)
+
+                    if local.codUsuario == MY_USER.codUsuario and local.estado == "A":
+                        color = COLOR_GREEN
+                        if prom.estado == DISCOUNT_STATUS_PENDING:
+                            color = COLOR_YELLOW
+
+                        print(f"{color}==========================={COLOR_RESET}")
+                        print(f"Codigo del descuento: {str(prom.codPromo)}")
+                        print(f"Codigo del local: {str(prom.codLocal)}")
+                        print(f"Fecha inicio: {prom.fechaDesdePromo}")
+                        print(f"Fecha finalizacion: {prom.fechaHastaPromo}")
+                        print(f"Estado: {color}{prom.estado}{COLOR_RESET}")
+                        print(f"{color}==========================={COLOR_RESET}")
 
 
 def askDate(txt):
@@ -925,8 +954,9 @@ def _askDatesLogic(txt):
     try:
         dateInput = input(f'{txt} (dd/mm/aaaa): ')
         date = datetime.strptime(dateInput, '%d/%m/%Y')
+        now = datetime.now()
 
-        if date.timestamp() < date.now().timestamp():
+        if date.timestamp() < datetime.strptime(f"{now.day}/{now.month}/{now.year}", '%d/%m/%Y').timestamp():
             print("[-] La fecha no puede ser anterior al dia de hoy")
             return ""
 
