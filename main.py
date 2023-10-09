@@ -1,6 +1,6 @@
 # Comision 104
 # Alumnos:
-# Ferrere, Santiago
+# Ferrero, Santiago
 # Civilotti, Genaro
 # Finelli, Constantino
 # Costamagna Mayol, Ricardo Luis 
@@ -68,10 +68,8 @@ LOCAL_NAME_LENGHT = 50
 LOCAL_ADDR_LENGHT = 50
 LOCAL_CATG_LENGHT = 50
 
-PROMO_TEXT_LENGHT = 200
-
-NEW_TEXT_LENGHT = 200
-NEW_TYPE_LENGHT = 20
+PROM_TEXT_LENGHT = 200
+PROM_STATUS_LENGHT = 10
 
 # Declaramos "variables" de los tipos de usuarios existentes
 USER_TYPE_ADMIN = "administrador"
@@ -128,20 +126,6 @@ def openFile(filePath):
 
     return logicFile
 
-# funcion para setear paths si estas en un sistema posix
-def setPath():
-    global mainPath, userFilePath, localsFilePath, promsFilePath, promsUseFilePath, newsFilePath, CLEAR_COMMAND
-
-    if os.name == "posix":
-        CLEAR_COMMAND = "clear"
-        mainPath = "./files/"
-        userFilePath = mainPath+"usuarios.dat"
-        localsFilePath = mainPath+"locales.dat"
-        promsFilePath = mainPath+"promociones.dat"
-        promsUseFilePath = mainPath+"uso_promociones.dat"
-        newsFilePath = mainPath+"novedades.dat" 
-
-
 # funcion para cargar archivos
 def loadFiles():
     global userFile, localsFile, promsFile, promsUseFile, newsFile
@@ -191,17 +175,17 @@ def parseUser(user):
     return user
 
 # funcion para guardar un local en el archivo
-def saveLocal(local, pos):
-    localsFile.seek(0, os.SEEK_END)
-
-    if pos != 0:
-        localsFile.seek(pos, 0)
-
+def saveLocal(local, pos, overwrite):    
     local.codLocal = str(local.codLocal).ljust(10)
     local.codUsuario  = str(local.codUsuario).ljust(10)
     local.nombreLocal = local.nombreLocal.ljust(LOCAL_NAME_LENGHT)
     local.ubicacionLocal = local.ubicacionLocal.ljust(LOCAL_ADDR_LENGHT)
     local.rubroLocal = local.rubroLocal.ljust(LOCAL_CATG_LENGHT)
+
+    if overwrite:
+        localsFile.seek(pos, 0)
+    else: 
+        localsFile.seek(pos, os.SEEK_END)
 
     pickle.dump(local, localsFile)
     localsFile.flush()
@@ -217,17 +201,21 @@ def parselocal(local):
     return local
 
 # funcion para guardar promocion en el archivo
-def saveProm(prom, pos):
-    promsFile.seek(0, os.SEEK_END)
-
-    if pos != 0:
-        promsFile.seek(pos, 0)
-
+def saveProm(prom, pos, overwrite):
     prom.codPromo = str(prom.codPromo).ljust(10)
-    prom.textoPromo = prom.textoPromo.ljust(200)
+    prom.textoPromo = prom.textoPromo.ljust(PROM_TEXT_LENGHT)
     prom.fechaDesdePromo = prom.fechaDesdePromo.ljust(10)
     prom.fechaHastaPromo = prom.fechaHastaPromo.ljust(10)
     prom.codLocal = str(prom.codLocal).ljust(10)
+    prom.estado = prom.estado.ljust(PROM_STATUS_LENGHT)
+    
+    for i in range(7):
+        prom.diasSemana[i] = str(prom.diasSemana[i])
+    
+    if overwrite:
+        promsFile.seek(pos, 0)
+    else: 
+        promsFile.seek(0, os.SEEK_END)
 
     pickle.dump(prom, promsFile)
     promsFile.flush()
@@ -238,15 +226,36 @@ def parseProm(prom):
     prom.textoPromo = prom.textoPromo.strip()
     prom.fechaDesdePromo = prom.fechaDesdePromo.strip()
     prom.fechaHastaPromo = prom.fechaHastaPromo.strip()
+    prom.estado = prom.estado.strip()
     prom.codLocal = int(prom.codLocal)
     
+    for i in range(7):
+        prom.diasSemana[i] = int(prom.diasSemana[i])
+
     return prom
+
+def saveUsedProm(usedProm):
+    promsUseFile.seek(0, os.SEEK_END)
+
+    usedProm.codCliente = str(usedProm.codCliente).ljust(10)
+    usedProm.codPromo = str(usedProm.codPromo).ljust(10)
+    usedProm.fechaUsoPromo = usedProm.fechaUsoPromo.ljust(10)
+
+    pickle.dump(usedProm, promsUseFile)
+    promsUseFile.flush()
+
+def parseUsedProm(usedProm):
+    usedProm.codCliente = int(usedProm.codCliente)
+    usedProm.codPromo = int(usedProm.codPromo)
+    usedProm.fechaUsoPromo = usedProm.fechaUsoPromo.strip()
+
+    return usedProm
 
 # funcion para la carga de usuario
 def loadAdmin():
     adminUser = Usuario()
     adminUser.codUsuario = 1
-    adminUser.nombreUsuario = "a"#@shopping.com"
+    adminUser.nombreUsuario = "admin@shopping.com"
     adminUser.tipoUsuario = USER_TYPE_ADMIN
     adminUser.claveUsuario = "12345"
 
@@ -330,7 +339,7 @@ def registerUser(uType):
 # funciones para buscar un local
 def searchPromEnginge(code):
     T = os.path.getsize(promsFilePath)
-    proms = Locales()
+    proms = Promocion()
     promsFound = False
     promsFile.seek(0,0)
 
@@ -384,7 +393,7 @@ def getLocalPosByCode(code):
     T = os.path.getsize(localsFilePath)
     pos = -1 
     localsFound = False
-    localsFile.seek(0,0)
+    localsFile.seek(0, 0)
 
     while not localsFound and localsFile.tell() < T:
         p = localsFile.tell()
@@ -392,7 +401,7 @@ def getLocalPosByCode(code):
         if tmp.codLocal == code:
             pos = p
             localsFound = True
-    
+
     return pos
 
 # funciones para buscar un usuario en base a ciertos datos
@@ -422,7 +431,7 @@ def searchUserByCode(code):
     return searchUserEnginge("", code)
 
 # funcion para validar si el nombre del local es valido
-def invalidLocalName(nombre):
+def getLocalByName(nombre):
     total = 0
     inicio = 0
 
@@ -438,21 +447,22 @@ def invalidLocalName(nombre):
         total = fileSize // singleT
 
     fin = total - 1
+    local = Locales()
     founded = False
 
     while (inicio <= fin and not founded):
         medio = (inicio + fin)//2
         localsFile.seek(medio*singleT, 0)
         l = parselocal(pickle.load(localsFile))
-
         if l.nombreLocal == nombre:
             founded = True
+            local = l
         elif l.nombreLocal < nombre:
            inicio = medio + 1
         elif l.nombreLocal > nombre:
             fin = medio - 1
     
-    return founded
+    return local
 
 # funcion para ordenar las categorias de mayor a menor
 def orderCategories():
@@ -561,8 +571,8 @@ def newLocals():
         local = Locales()
         registeredLocals = registeredLocals + 1
 
-        while invalidLocalName(lName):
-            print("[-] Nombre de local en uso")
+        while getLocalByName(lName).codLocal != 0:
+            print("[!] Nombre de local en uso")
             lName = input("[?] Ingrese el nombre del local\n")
 
         local.nombreLocal = lName
@@ -571,19 +581,19 @@ def newLocals():
         
         local.rubroLocal = input(f"[?] Ingrese el rubro del local ({LOCAL_TYPE_FASHION}, {LOCAL_TYPE_FOOD}, {LOCAL_TYPE_PERFUME})\n").lower()
         while local.rubroLocal != LOCAL_TYPE_FASHION and local.rubroLocal != LOCAL_TYPE_PERFUME and local.rubroLocal != LOCAL_TYPE_FOOD:
-            print("[-] Rubro invalido")
+            print("[!] Rubro invalido")
             local.rubroLocal = input(f"[?] Ingrese un rubro de local valido ({LOCAL_TYPE_FASHION}, {LOCAL_TYPE_FOOD}, {LOCAL_TYPE_PERFUME})\n").lower()
 
         local.codUsuario = int(input("[?] Ingrese el codigo de usuario del dueño del local\n"))
         while (searchUserByCode(local.codUsuario).tipoUsuario != USER_TYPE_LOCALOWNER):
-            print("[-] El codigo de usuario ingresado no existe o no pertenece a un dueño de local")
+            print("[!] El codigo de usuario ingresado no existe o no pertenece a un dueño de local")
             local.codUsuario = int(input("[?] Ingrese el codigo de usuario del dueño del local\n"))
 
         # sumar uno a la categoria
         addToCategory(local.rubroLocal)
 
         # Se guarda el nuevo local en archivo con la función "saveLocal"
-        saveLocal(local, 0)
+        saveLocal(local, 0, False)
         orderLocalsByName()
 
         os.system(CLEAR_COMMAND)
@@ -606,7 +616,7 @@ def newLocals():
 def askConfirm(texto): #parametro localIndex tipo INT y parametro texto de tipo STRING
     opt = input("[?] " + texto + " (S - si, N - no)\n").lower()
     while opt != "s" and opt != "n":
-        print("[-] Opcion invalida")
+        print("[!] Opcion invalida")
         opt = input("[?] " + texto + " (S - si, N - no)\n").lower()
 
     return opt == "s" or opt == "si"
@@ -614,19 +624,19 @@ def askConfirm(texto): #parametro localIndex tipo INT y parametro texto de tipo 
 def enableLocalPrompt(localData, posL): #parametro localIndex tipo INT
     if askConfirm("Desea activar nuevamente este local"):
         localData.estado = 'A'
-        saveLocal(localData, posL)
+        saveLocal(localData, posL, True)
         
 def disableLocalPrompt(localData, posL): #parametro localIndex tipo INT
     if askConfirm("Desea eliminar este local"):
         localData.estado = 'B'
-        saveLocal(localData, posL)
+        saveLocal(localData, posL, True)
 
 def modifyLocal():
     lCode = input("[?] Ingrese el codigo del local\n")
     pos = getLocalPosByCode(int(lCode))
 
     while pos == -1:
-        print("[-] Codigo de local invalido")
+        print("[!] Codigo de local invalido")
         lCode = input("[?] Ingrese el codigo del local\n")
         pos = getLocalPosByCode(int(lCode))
 
@@ -636,23 +646,26 @@ def modifyLocal():
         enableLocalPrompt(localData, pos)
     
     if localData.estado == "A":
-        localData.nombreLocal = input("[?] Ingrese el nombre del local (ingrese \".\" para salir)\n")
+        newName = input("[?] Ingrese el nombre del local (ingrese \".\" para salir)\n")
         
-        if localData.nombreLocal != ".":
-            while invalidLocalName(localData.nombreLocal):
-                print("[-] Nombre de local en uso")
-                localData.nombreLocal = input("[?] Ingrese el nombre del local\n")
+        if newName != ".":
+            if newName != localData.nombreLocal:
+                while getLocalByName(newName).codLocal != 0:
+                    print("[!] Nombre de local en uso")
+                    newName = input("[?] Ingrese el nombre del local\n")
+                
+                localData.nombreLocal = newName
 
             localData.ubicacionLocal = input("[?] Ingrese la ubicacion del local\n")
 
             r = input("[?] Ingrese el rubro del local\n").lower()
             while r != LOCAL_TYPE_FASHION and r != LOCAL_TYPE_FOOD and r != LOCAL_TYPE_PERFUME:
-                print("[-] Rubro invalido")
+                print("[!] Rubro invalido")
                 r = input("[?] Ingrese el rubro del local\n").lower()
 
             localData.codUsuario = int(input("[?] Ingrese el codigo de usuario del dueño del local\n"))
             while (searchUserByCode(localData.codUsuario).tipoUsuario != USER_TYPE_LOCALOWNER):
-                print("[-] El codigo de usuario ingresado no existe o no pertenece a un dueño de local")
+                print("[!] El codigo de usuario ingresado no existe o no pertenece a un dueño de local")
                 localData.codUsuario = int(input("[?] Ingrese el codigo de usuario del dueño del local\n"))
 
             # Si se modifica el rubro, se resta uno al actual y se suma uno al nuevo
@@ -661,7 +674,7 @@ def modifyLocal():
                 localData.rubroLocal = r
                 addToCategory(localData.rubroLocal)
 
-            saveLocal(localData, pos)
+            saveLocal(localData, pos, True)
 
             orderCategories()
             orderLocalsByName()
@@ -671,14 +684,14 @@ def deleteLocal():
     pos = getLocalPosByCode(int(lCode))
 
     while pos == -1:
-        print("[-] Codigo de local invalido")
+        print("[!] Codigo de local invalido")
         lCode = input("[?] Ingrese el codigo del local\n")
         pos = getLocalPosByCode(int(lCode))
 
     localData = searchLocalByCode(int(lCode))
 
     if localData.estado != 'A':
-        print("[-] Este local ya fue dado de baja")
+        print("[!] Este local ya fue dado de baja")
 
     if localData.estado == 'A':
         disableLocalPrompt(localData, pos)
@@ -687,9 +700,12 @@ def deleteLocal():
 def localMaps():
     fileSize = os.path.getsize(localsFilePath)
     localsFile.seek (0, 0)
-    _ = pickle.load(localsFile)
-    regSize = localsFile.tell() 
-    total = int(fileSize / regSize)  
+    total = 0
+
+    if fileSize > 0:
+        _ = pickle.load(localsFile)
+        regSize = localsFile.tell() 
+        total = int(fileSize / regSize)  
     
     for fila in range(0,10):
         inicio = 5 * fila
@@ -734,7 +750,7 @@ def localManage():
 
     while opcion == "" or ord(opcion) != 101: # cuando la opcion sea distinta de E 
         while (opcion == "" or (ord(opcion) < 97 or ord(opcion) > 101)): # Valida que la opcion sea una letra entre A y E
-            print("[-] La opcion ingresada no es valida")
+            print("[!] La opcion ingresada no es valida")
             opcion = input("[?] Ingrese el indice de la opcion requerida\n").lower()
 
         match ord(opcion):
@@ -767,10 +783,10 @@ def newsManage():
     
     while opcion == "" or ord(opcion) != 101: # cuando la opcion sea distinta de E 
         while (opcion == "" or (ord(opcion) < 97 or ord(opcion) > 101)): # Valida que la opcion sea una letra entre A y E
-            print("[-] La opcion ingresada no es valida")
+            print("[!] La opcion ingresada no es valida")
             opcion = input("[?] Ingrese el indice de la opcion requerida\n").lower()
 
-        print("[-] Diagramado en chapin...")
+        print("[!] Diagramado en chapin...")
         newsManageMenuOpts()
         opcion = input("[?] Ingrese el indice de la opcion requerida\n").lower()
 
@@ -778,7 +794,7 @@ def newsManage():
 def adminMenuOpts():
     print("1. Gestion de locales")
     print("2. Crear cuentas de dueños de locales")
-    print("3. Aprobar / Denegarsolicitud de descuento")
+    print("3. Aprobar / Denegar solicitud de descuento")
     print("4. Gestión de novedades")
     print("5. Reporte de utilización de descuentos")
     print("0. Cerrar sesion")
@@ -803,10 +819,11 @@ def adminMenu():
                 newsManage()
             case 5:
                 os.system(CLEAR_COMMAND)
-                print("[-] En construccion...")
+                reportOfUsedDiscount()
 
         adminMenuOpts()
         opcion = askValidOption(0, 5)
+    os.system(CLEAR_COMMAND)
 
 # Funcion que se encarga del menu para dueños de local
 def localOwnerMenuOpts():
@@ -824,7 +841,7 @@ def localOwnerMenu():
         match opc:
             case 1: createDiscount()
             case 2: reportOfUsedDiscount()
-            case 3: print("[-] Diagramado en chapin")
+            case 3: print("[!] Diagramado en chapin")
 
         localOwnerMenuOpts()
         opc = askValidOption(0, 3)
@@ -841,14 +858,72 @@ def clientMenu():
     opcion = askValidOption(0, 3)
 
     while opcion != 0:
-        os.system(CLEAR_COMMAND)
-        print("[-] En construccion...")
+        match opcion:
+            case 1: searchDiscounts()
+            case 2: askForDiscounts()
+            case 3: print('[!] Diagramado en chapin')
 
         clientMenuOpts()
         opcion = askValidOption(0, 3)
 
+def searchDiscounts():
+    os.system(CLEAR_COMMAND)
+    
+    localCode = int(input('[?] Ingrese el codigo de local para ver los descuentos que ofrece (sale con 0): '))
+    
+    local = searchLocalByCode(localCode)
+    while localCode != 0 and local.codLocal == 0:
+        localCode = int(input('[?] Ese codigo de local no existe, ingrese otro: '))
+        local = searchLocalByCode(localCode)
+
+    if localCode != 0:
+        requestDate = askDate('[?] Ingrese una fecha: ', True)
+        dayOfTheWeek = datetime.strptime(requestDate, '%d/%m/%Y').weekday()
         
-    print("[-] El programa ha finalizado")
+        fileSize = os.path.getsize(promsFilePath)
+        promsFile.seek(0, 0)
+
+        while promsFile.tell() < fileSize:
+            promsFile.tell()
+            prom = parseProm(pickle.load(promsFile))
+            
+            if prom.codLocal == local.codLocal and prom.estado == DISCOUNT_STATUS_APPROVED:
+                if datetime.strptime(requestDate, '%d/%m/%Y').timestamp() >= datetime.strptime(prom.fechaDesdePromo, '%d/%m/%Y').timestamp() and datetime.strptime(requestDate, '%d/%m/%Y').timestamp() <= datetime.strptime(prom.fechaHastaPromo, '%d/%m/%Y').timestamp() and prom.diasSemana[dayOfTheWeek] == 1:
+                    print("================================================")
+                    print(f"Codigo de la promoción: {prom.codPromo}")
+                    print(f"Descripcion: {prom.textoPromo}")
+                    print(f"Valida desde: {prom.fechaDesdePromo}")
+                    print(f"Valida hasta: {prom.fechaHastaPromo}")
+                    print("================================================")
+
+def askForDiscounts():
+    os.system(CLEAR_COMMAND)
+
+    codProm = int(input('[?] Ingresar el codigo de la promoción que usted quiere utilizar (0 para salir): '))
+    discount = searchPromByCode(codProm)
+    
+    while codProm != 0 and discount.codPromo != codProm:
+        codProm = int(input(f'[?] El codigo de descuento {codProm} no existe, elije otro (0 para salir): '))
+        discount = searchPromByCode(codProm)   
+    
+    requestedDate = datetime.now().timestamp()
+    dayOfTheWeek = datetime.now().weekday()
+
+    while discount.codPromo != 0 and (discount.estado != DISCOUNT_STATUS_APPROVED or requestedDate <= datetime.strptime(discount.fechaDesdePromo, '%d/%m/%Y').timestamp() or requestedDate >= datetime.strptime(discount.fechaHastaPromo, '%d/%m/%Y').timestamp() or discount.diasSemana[dayOfTheWeek] != 1):
+        print('[!] Codigo de promo no valido')
+        codProm = input('[?] Ingresar el codigo de la promoción que usted quiere utilizar (0 para salir): ')
+        discount = searchPromByCode(codProm)   
+
+    if codProm != 0:
+        usePromRecord = UsoPromocion()
+        today = datetime.now()
+
+        usePromRecord.codCliente = MY_USER.codUsuario
+        usePromRecord.codPromo = codProm
+        usePromRecord.fechaUsoPromo = f"{today.day}/{today.month}/{today.year}"
+        
+        saveUsedProm(usePromRecord)
+        print("[+] Promocion utilizada!")
 
 # funcion que retorna un booleano dependiendo si el usuario ingresado existe
 def validLogin(mail, passwd): # parametro mail y passwd de tipo string
@@ -875,12 +950,12 @@ def loginUser():
     
     while ((not validLogin(username, password)) and attempts <= 3):
         if attempts > 0 and attempts < 3:
-            print("[-] Intentos fallidos: " + str(attempts) + "/3")
+            print("[!] Intentos fallidos: " + str(attempts) + "/3")
             username = input("[?] Ingrese su nombre de usuario: ")
             password = maskpass.askpass("[?] Ingrese su contraseña: ")
         elif attempts >= 3:
             os.system(CLEAR_COMMAND)
-            print("[-] Demasiados intentos fallidos, el programa se cerrara!")
+            print("[!] Demasiados intentos fallidos, el programa se cerrara!")
             
         attempts = attempts + 1
 
@@ -910,20 +985,20 @@ def createDiscount():
             currentL = searchLocalByCode(localCode)
 
         if currentL.estado != "A":
-            print("[-] Local dado de baja, reactivelo para crear descuentos")
+            print("[!] Local dado de baja, reactivelo para crear descuentos")
             localCode = 0
 
         if localCode != 0:
             disc.codLocal = localCode
             disc.textoPromo = input('[?] Ingrese la descripcion del descuento: ')
             disc.estado = DISCOUNT_STATUS_PENDING
-            disc.fechaDesdePromo = askDate("[?] Ingrese la fecha de inicio del descuento")
-            disc.fechaHastaPromo = askDate("[?] Ingrese la fecha de finalizacion del descuento")
+            disc.fechaDesdePromo = askDate("[?] Ingrese la fecha de inicio del descuento", True)
+            disc.fechaHastaPromo = askDate("[?] Ingrese la fecha de finalizacion del descuento", True)
 
             while datetime.strptime(disc.fechaDesdePromo, '%d/%m/%Y').timestamp() >= datetime.strptime(disc.fechaHastaPromo, '%d/%m/%Y').timestamp(): 
-                print("[-] Fechas de promocion invalida, el inicio no puede ser despues del final")
-                disc.fechaDesdePromo = askDate("[?] Ingrese la fecha de inicio del descuento")
-                disc.fechaHastaPromo = askDate("[?] Ingrese la fecha de finalizacion del descuento")
+                print("[!] Fechas de promocion invalida, el inicio no puede ser despues del final")
+                disc.fechaDesdePromo = askDate("[?] Ingrese la fecha de inicio del descuento", True)
+                disc.fechaHastaPromo = askDate("[?] Ingrese la fecha de finalizacion del descuento", True)
 
             disc.codPromo = getActualRecordsAmount(promsFilePath, promsFile) + 1
             
@@ -932,7 +1007,7 @@ def createDiscount():
                 valid = askValidOption(0, 1)
                 disc.diasSemana[dayIndex] = valid
             
-            saveProm(disc)
+            saveProm(disc, 0, False)
             
             localCode = int(input('[?] Ingrese un codigo de local para crear un descuento(para volver ingrese 0): '))
 
@@ -941,10 +1016,15 @@ def listDiscounts(onlyFromActualUser, onlyOnDate, onlyPending):
     promsFile.seek(0, 0)
     
     if quantityOfPromotions > 0:
-        print("Promociones activas de tus locales: ")
+        if MY_USER.tipoUsuario == USER_TYPE_LOCALOWNER:
+            print("Promociones activas de tus locales: ")
+        else:
+            print("Promociones pendientes: ")
+
         for i in range(quantityOfPromotions):
             if i < quantityOfPromotions:
                 prom = parseProm(pickle.load(promsFile))
+
                 showNoPending = True
 
                 if onlyPending:
@@ -968,7 +1048,7 @@ def listDiscounts(onlyFromActualUser, onlyOnDate, onlyPending):
 
                             availableDays = ""
 
-                            for i in range(0, 6):
+                            for i in range(0, 7):
                                 if prom.diasSemana[i] == 1:
                                     space = " "
                                     if availableDays == "":
@@ -990,51 +1070,164 @@ def listDiscounts(onlyFromActualUser, onlyOnDate, onlyPending):
                             print(f"Estado: {color}{prom.estado}{COLOR_RESET}")
                             print(f"{color}==========================={COLOR_RESET}")
 
-
-def askDate(txt):
-    finalDate = _askDatesLogic(txt)
+def askDate(txt, fromNow):
+    finalDate = _askDatesLogic(txt, fromNow)
     while finalDate == "":
-        print('[-] Usted ha ingresado una fecha invalida, intente de nuevo')
-        finalDate = _askDatesLogic(txt)
+        print('[!] Usted ha ingresado una fecha invalida, intente de nuevo')
+        finalDate = _askDatesLogic(txt, fromNow)
     
     return finalDate
 
-def _askDatesLogic(txt):
+def _askDatesLogic(txt, fromNow):
     try:
         dateInput = input(f'{txt} (dd/mm/aaaa): ')
         date = datetime.strptime(dateInput, '%d/%m/%Y')
         now = datetime.now()
 
-        if date.timestamp() < datetime.strptime(f"{now.day}/{now.month}/{now.year}", '%d/%m/%Y').timestamp():
-            print("[-] La fecha no puede ser anterior al dia de hoy")
-            return ""
+        if fromNow:
+            if date.timestamp() < datetime.strptime(f"{now.day}/{now.month}/{now.year}", '%d/%m/%Y').timestamp():
+                print("[!] La fecha no puede ser anterior al dia de hoy")
+                return ""
 
         return dateInput
     except ValueError:
         return ""
     
 def manageDiscounts():
-    listDiscounts(False, False, True)
-    codProm = int(input('[?] Ingrese un codigo de descuento: '))
-    prom = searchPromByCode(codProm)
-
-    while prom.codPromo != codProm or prom.estado != DISCOUNT_STATUS_PENDING:
-        codProm = int(input('[?] Codigo de descuento invalido, ingrese un codigo de descuento: '))
+    if getActualRecordsAmount(promsFilePath, promsFile) > 0:
+        listDiscounts(False, False, True)
+        codProm = int(input('[?] Ingrese un codigo de descuento (0 para salir): '))
         prom = searchPromByCode(codProm)
-    
-    pos = getPromPosByCode(codProm)
-    
-    print("[?] Que accion quiere realizar con el descuento (1 - aceptar, 0 - rechazar)")
-    opt = askValidOption(0, 1)
-    state = DISCOUNT_STATUS_APPROVED
-    if opt == 0:
-        state = DISCOUNT_STATUS_REJECTED
 
-    prom.estado = state
-    saveProm(prom, pos)
-    
+        while codProm != 0 and (prom.codPromo != codProm or prom.estado != DISCOUNT_STATUS_PENDING):
+            codProm = int(input('[?] Codigo de descuento invalido, ingrese un codigo de descuento: '))
+            prom = searchPromByCode(codProm)
+
+        if codProm != 0:
+            pos = getPromPosByCode(codProm)
+            
+            print("[?] Que accion quiere realizar con el descuento (1 - aceptar, 0 - rechazar)")
+            opt = askValidOption(0, 1)
+            state = DISCOUNT_STATUS_APPROVED
+            if opt == 0:
+                state = DISCOUNT_STATUS_REJECTED
+
+            prom.estado = state
+            saveProm(prom, pos, True)
+    else:
+        print("[!] No hay descuentos pendientes")
+
+def countPromUses(promCode):
+    uses = 0    
+    fileSize = os.path.getsize(promsUseFilePath)
+    promsUseFile.seek(0, 0)
+
+    while promsUseFile.tell() < fileSize:
+        promsUseFile.tell()
+        tmp = parseUsedProm(pickle.load(promsUseFile))
+        
+        if tmp.codPromo == promCode:
+            uses += 1
+
+    return uses
+
 def reportOfUsedDiscount():
-    print("TODO:")
+    print('Ver uso de descuentos descuentos..')
+
+    dateSince = askDate("[?] Desde que fecha", False)
+    dateUntil = askDate("[?] Hasta que fecha", False)
+ 
+    since = datetime.strptime(dateSince, '%d/%m/%Y')
+    until = datetime.strptime(dateUntil, '%d/%m/%Y')
+
+    while since >= until:
+        print("[!] La fecha inicial no puede ser mayor que la final.")
+        dateSince = askDate("[?] Desde que fecha", False)
+        dateUntil = askDate("[?] Hasta que fecha", False)
+        since = datetime.strptime(dateSince, '%d/%m/%Y')
+        until = datetime.strptime(dateUntil, '%d/%m/%Y')
+    
+
+    generateReportOfUse(dateSince, dateUntil)
+    
+def getLocalsWithDiscounts(since, until, ownerId):
+    localsName = ""
+    fileSize = os.path.getsize(promsFilePath)
+    promsFile.seek(0, 0)
+
+    while promsFile.tell() < fileSize:
+        promsFile.tell()
+        tmp = parseProm(pickle.load(promsFile))
+        showOnlyFromUser = False
+
+        if ownerId != 0:
+            showOnlyFromUser = True
+
+        local = searchLocalByCode(tmp.codLocal)
+
+        fechaDesdePromo = datetime.strptime(tmp.fechaDesdePromo, '%d/%m/%Y').timestamp()
+        sinceTmp = datetime.strptime(since, '%d/%m/%Y').timestamp()
+        fechaHastaPromo = datetime.strptime(tmp.fechaHastaPromo, '%d/%m/%Y').timestamp()
+        untilT = datetime.strptime(until, '%d/%m/%Y').timestamp()
+
+        if not showOnlyFromUser or (local.codUsuario == ownerId):
+            if tmp.estado == DISCOUNT_STATUS_APPROVED and fechaDesdePromo >= sinceTmp and fechaHastaPromo <= untilT:
+                if not localsName.startswith(f"{local.nombreLocal},") and not f",{local.nombreLocal}," in localsName:
+                    if localsName != "":
+                        localsName = f"{localsName}{local.nombreLocal},"
+                    else:
+                        localsName = f"{local.nombreLocal},"
+
+    return localsName[:-1]
+
+def formatText(txt, length):
+    if len(txt) > length:
+        toRemove = (len(txt) - length) + 3
+        return f"{txt[:-toRemove]}..."
+
+    if len(txt) < length:
+        return txt.ljust(length, " ")
+
+    return txt
+
+def generateReportOfUse(since, until):
+    PromCharsLim = 14
+    TextCharsLim = 35
+    DateCharsLim = 12
+    UsesCharsLim = 13
+    ownerId = 0 
+
+    if MY_USER.tipoUsuario == USER_TYPE_LOCALOWNER:
+        ownerId = MY_USER.codUsuario
+
+    localsWithDiscounts = getLocalsWithDiscounts(since, until, ownerId)
+
+    print(f"{COLOR_YELLOW}Reporte de uso de descuentos{COLOR_RESET}\n")
+    print(f"Fecha desde: {since}    Fecha hasta: {until}")
+    
+    for storeIndex in range(0, len(localsWithDiscounts)):
+        l = getLocalByName(localsWithDiscounts[storeIndex])
+        if l.codLocal != 0:
+            print(f"Local {l.codLocal}: {l.nombreLocal}")
+            print("┌──────────────┬───────────────────────────────────┬────────────┬────────────┬─────────────┐")
+            print("│ Codigo Promo │ Texto                             │  F. Desde  │  F. Hasta  │   C. Usos   │")
+            print("├──────────────┼───────────────────────────────────┼────────────┼────────────┼─────────────┤")
+            
+            fileSize = os.path.getsize(promsFilePath)
+            promsFile.seek(0, 0)
+
+            while fileSize > promsFile.tell():
+                disc = parseProm(pickle.load(promsFile))
+                if disc.codLocal == l.codLocal:
+                    cod = formatText(str(disc.codPromo), PromCharsLim)
+                    txt = formatText(disc.textoPromo, TextCharsLim)
+                    sin = formatText(disc.fechaDesdePromo, DateCharsLim)
+                    unt = formatText(disc.fechaHastaPromo, DateCharsLim)
+                    use = formatText(str(countPromUses(disc.codPromo)), UsesCharsLim) #TODO:
+                    print(f"│{cod}│{txt}│{sin}│{unt}│{use}│")
+
+            print("└──────────────┴───────────────────────────────────┴────────────┴────────────┴─────────────┘")
+
 
 # Programa Principal
 def entryPoint():
@@ -1047,10 +1240,9 @@ def entryPoint():
 ╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚═╝     ╚═╝     ╚═╝╚═╝  ╚═══╝ ╚═════╝ 
     \n''')
         
-    setPath()
     loadFiles()
     authMenu()
-    print("[-] El programa se esta cerrando")
+    print("[!] El programa se esta cerrando")
     unloadFiles()
 
 entryPoint()
